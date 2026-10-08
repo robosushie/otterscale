@@ -26,9 +26,9 @@ Optional body: why, not a file list.
 ## Examples
 
 ```text
-feat(api): add Clerk-backed GET /api/me
+feat(api): add OIDC session for GET /api/me
 
-Product user id is the Clerk JWT sub so SPA and API share identity.
+Subject is the IdP sub so console and API share identity.
 ```
 
 ```text

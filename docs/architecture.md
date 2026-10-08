@@ -6,6 +6,12 @@ Otterscale is a **control platform** in front of **one Headscale instance per te
 
 Reference: [design specification PDF](./external/Otterscale_Design_Architecture.pdf) v0.5.
 
+### Current implementation (Phase 1–2, single tenant)
+
+The shipping control plane is a **Next.js 16** app with **Prisma 6** on PostgreSQL (`DATABASE_URL`). One organisation, one Headscale instance (optional in dev), environments as tags, policy compiler, audit hash chain, and RBAC (Owner / super admin / tenant roles). Auth: **Auth.js** with generic OIDC and optional **local credentials + TOTP**. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
+
+Code layout: `app/` (routes), `components/`, `lib/` (`headscale/` adapter only for Headscale HTTP), `prisma/`, `deploy/`.
+
 ---
 
 ## High-level topology

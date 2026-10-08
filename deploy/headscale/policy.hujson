@@ -1,0 +1,13 @@
+{
+  // Minimal open policy for local / first boot. Replace via Otterscale policy apply.
+  "groups": {
+    "group:default": []
+  },
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["*"],
+      "dst": ["*:*"]
+    }
+  ]
+}

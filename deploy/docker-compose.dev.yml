@@ -1,0 +1,20 @@
+# Local dev only: optional Postgres (not used in production deploy).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: otterscale
+      POSTGRES_PASSWORD: otterscale
+      POSTGRES_DB: otterscale
+    ports:
+      - "5432:5432"
+    volumes:
+      - otterscale_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U otterscale"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  otterscale_pg:

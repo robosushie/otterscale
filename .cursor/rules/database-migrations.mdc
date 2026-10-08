@@ -1,0 +1,14 @@
+---
+description: Prisma migrations — use pnpm db:make only, never hand-edit SQL
+globs: prisma/**/*
+alwaysApply: false
+---
+
+# Database migrations
+
+Full reference: [`.agents/rules/database-migrations.md`](../../.agents/rules/database-migrations.md).
+
+- **Never** manually edit or add files under `prisma/migrations/`.
+- Update `prisma/schema.prisma`, then run **`pnpm db:make -- <name>`** (autogenerate revision).
+- Deploy applied migrations: **`pnpm db:migrate`** (`prisma migrate deploy`).
+- No `prisma db push` for committed schema.
