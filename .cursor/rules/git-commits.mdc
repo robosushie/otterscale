@@ -1,0 +1,33 @@
+---
+description: Conventional commit message format for this repo
+alwaysApply: true
+---
+
+# Git commits
+
+Full reference: [`.agents/rules/git-commits.md`](../../.agents/rules/git-commits.md).
+
+Only commit when the user asks.
+
+```text
+<type>(optional-scope): <imperative summary>
+
+Optional body: why, not a file list.
+```
+
+Types: `feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style`
+
+- Imperative, ≤72 chars, no trailing period
+- One logical change; HEREDOC for the message
+- No `--no-verify` / amend-pushed unless user asks
+
+```text
+feat(api): add Clerk-backed GET /api/me
+
+Product user id is the Clerk JWT sub so SPA and API share identity.
+```
+
+```text
+# ❌ BAD
+Updated files and fixed stuff
+```

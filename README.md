@@ -1,3 +1,9 @@
+Open-source team mesh control platform on [Headscale](https://github.com/juanfont/headscale), with a role-based console and **official Tailscale clients only** (no custom VPN app).
+
+**Documentation:** [docs/README.md](./docs/README.md) — [roadmap](./docs/roadmap.md), [architecture](./docs/architecture.md), [deployment](./docs/deployment.md), [design theme](./docs/theme.md). Source spec: [docs/external/Otterscale_Design_Architecture.pdf](./docs/external/Otterscale_Design_Architecture.pdf).
+
+## Console (Next.js)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
