@@ -1,0 +1,22 @@
+---
+description: Follow root AGENTS.md for all Otterscale coding agents
+alwaysApply: true
+---
+
+# Shared agent policy
+
+Follow [`AGENTS.md`](../../AGENTS.md) at the repo root for Next.js, TypeScript, SOLID, theme, docs, and git commits.
+
+Modular twins: [`.agents/rules/`](../../.agents/rules/) — `agents-policy.md`, `typescript-standards.md`, `solid-principles.md`, `theme.md`, `git-commits.md`.
+
+Match existing patterns under `app/` as the console grows; planned Go control plane lives under `cmd/` / `internal/` per `docs/architecture.md`.
+
+Non-negotiables:
+
+- Read `node_modules/next/dist/docs/` before changing framework behavior
+- No secrets in git; no inventing infra/CDK/deploy unless asked
+- Missing OIDC/required env → fail loud (no silent auth fallback UI)
+- Product UI → `docs/theme.md`
+- Commits only when the user asks → `git-commits.mdc`
+
+TypeScript & SOLID details: `.agents/rules/typescript-standards.md`, `.agents/rules/solid-principles.md`.
