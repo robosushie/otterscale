@@ -12,7 +12,7 @@ Follow [`AGENTS.md`](../../AGENTS.md) at the repo root for Next.js guidance, Ott
 
 1. Read `node_modules/next/dist/docs/` for anything touching the App Router, server actions, or config (this Next.js version may differ from training data).
 2. For product behavior, prefer [`docs/architecture.md`](../../docs/architecture.md) and [`docs/roadmap.md`](../../docs/roadmap.md) over inventing features.
-3. Match existing patterns under `app/` and any new packages; do not copy Blueprint/Python layouts (`src/lib/auth/clerk.py`, SQLModel) — this repo is TypeScript-first today with a planned Go control plane.
+3. Match existing patterns under `app/`, `lib/`, and `components/` — TypeScript control plane with Prisma; planned Go services live under `cmd/` later per architecture docs.
 
 ## Non-negotiables
 
@@ -21,6 +21,7 @@ Follow [`AGENTS.md`](../../AGENTS.md) at the repo root for Next.js guidance, Ott
 - **Auth/config fail loud** — if OIDC or required env vars are missing, error at startup or API boundary; no silent “guest mode” or fake logged-in UI.
 - **UI** — [`docs/theme.md`](../../docs/theme.md) for all product surfaces.
 - **Commits** — only when the user asks; [git-commits.md](./git-commits.md).
+- **Migrations** — edit `prisma/schema.prisma` only; run `pnpm db:make -- <name>`; never hand-write SQL under `prisma/migrations/` ([database-migrations.md](./database-migrations.md)).
 - **Scope** — smallest correct diff; one logical change per commit.
 
 ## Stack (this repo)

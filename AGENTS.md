@@ -17,9 +17,10 @@ All coding agents follow this file first. Cursor: [`.cursor/rules/agents-policy.
 | [`.agents/rules/agents-policy.md`](./.agents/rules/agents-policy.md) | Non-negotiables, stack, before-you-code |
 | [`.agents/rules/typescript-standards.md`](./.agents/rules/typescript-standards.md) | TS strictness, Next.js App Router, types |
 | [`.agents/rules/solid-principles.md`](./.agents/rules/solid-principles.md) | SOLID for console + planned Go services |
+| [`.agents/rules/database-migrations.md`](./.agents/rules/database-migrations.md) | Prisma: `pnpm db:make` only; never hand-edit migrations |
 | [`docs/architecture.md`](./docs/architecture.md) | Components, layering, Headscale adapter boundary |
 
-**Non-negotiables:** no secrets in git; no infra/CDK/deploy invention unless asked; required auth/env must **fail loud** (no silent guest auth UI); smallest correct diff; UI uses [theme](#otterscale-design-theme); commits only when the user asks.
+**Non-negotiables:** no secrets in git; no infra/CDK/deploy invention unless asked; required auth/env must **fail loud** (no silent guest auth UI); **never manually edit `prisma/migrations/`**—use `pnpm db:make`; smallest correct diff; UI uses [theme](#otterscale-design-theme); commits only when the user asks.
 
 ## Otterscale design theme
 
@@ -33,7 +34,7 @@ UI and styling follow the light editorial theme in `docs/theme.md`.
 | [`.agents/rules/theme.md`](./.agents/rules/theme.md) | Antigravity / glob-triggered UI rules |
 | [`.cursor/rules/theme.mdc`](./.cursor/rules/theme.mdc) | Cursor UI rule (same theme) |
 
-**Quick colors:** canvas `#f2f0eb`, text `#292827`, primary CTA `#421d24`, links `#714cb6`, secondary button `#d4c7ff`, dark band `#0c4243` (full-bleed only).
+**Quick colors:** canvas `#f6f3f1`, text `#242424`, primary CTA `#2b59d1`, secondary `#242424`, border `#cecac8`, emphasis surface `#cfdaf5`. Serif headlines (weight 400) + mono UI.
 
 ## Git commits
 

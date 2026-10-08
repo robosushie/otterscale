@@ -10,47 +10,29 @@ Full spec: [`docs/theme.md`](../../docs/theme.md). Implement tokens in `app/glob
 
 ## Non‑negotiables
 
-- Canvas `#f2f0eb` (warm parchment); text `#292827`; borders `#e3e3e2`.
-- Primary filled CTA: `#421d24` + white text only—no second chromatic button fill.
-- Links / “Learn more”: `#714cb6` only—never violet on buttons or badges.
-- Secondary actions: lilac fill `#d4c7ff` + `#292827` text + 1px charcoal border, 8px radius.
-- Headlines ≥28px: weight **460**, not 700. Display 48–64px with tight negative tracking per theme doc.
-- No card `box-shadow`; floating hero cards use ~85% white + light border, no shadow.
-- `#0c4243` only on full-bleed dark bands—not cards or chrome.
-- Do not use `prefers-color-scheme: dark` for Otterscale marketing/product shell unless explicitly requested.
-
-## Typography
-
-- Stack: Super Sans VF, fallback **Inter** via `next/font` until VF is available.
-- Body 16px / lh 1.2 / weight 460 on parchment.
+- Canvas `#f6f3f1` (parchment); text `#242424`; borders `#cecac8`.
+- Primary filled CTA: `#2b59d1` + parchment/white uppercase mono — one per screen.
+- Secondary filled: `#242424`. Ghost: 1px Off-Black border, transparent.
+- Headlines: Instrument Serif weight **400** only. Body/UI: IBM Plex Mono.
+- Buttons/tags: 100px / 9999px pills. Cards: 40px radius, 40px padding.
+- No card `box-shadow`. Pastels (sky, mint, coral, gold) are decorative washes only.
+- Do not use `prefers-color-scheme: dark` for product UI unless explicitly requested.
 
 ## Layout
 
-- Content max-width 1200px centered; section gaps 64–96px; card padding 16px.
-- Sticky header: 64px, `backdrop-filter: blur(12px)`, bottom border on scroll.
+- Content max-width 1432px; section gaps 64px; nav ~80px.
 
 ## Tailwind usage
 
-Prefer token-backed utilities after `@theme` registration (e.g. `bg-warm-parchment`, `text-ink-charcoal`, `bg-midnight-wine`). Avoid hard-coded `#171717`, Geist-default neutrals, or generic `gray-*` for product UI.
+Prefer token-backed utilities (`bg-parchment`, `text-off-black`, `bg-lake-blue`, `border-ash`). Avoid Geist neutrals and generic `gray-*`.
 
 ## Example — primary button
 
 ```tsx
 <button
   type="button"
-  className="inline-flex h-12 items-center gap-2 rounded-2xl bg-midnight-wine px-5 text-base font-[460] text-paper-white"
+  className="inline-flex h-12 items-center gap-2 rounded-[100px] bg-lake-blue px-8 text-[14px] font-medium uppercase tracking-[-0.025em] text-parchment"
 >
-  Get started
+  Get started ▸
 </button>
-```
-
-## Example — inline link
-
-```tsx
-<a
-  href="/learn"
-  className="font-[460] text-royal-violet no-underline transition-[text-decoration] duration-200 hover:underline"
->
-  Learn more
-</a>
 ```

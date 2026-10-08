@@ -8,37 +8,36 @@ globs: app/**/*.{tsx,css},**/*.css
 
 Canonical reference: @docs/theme.md
 
-When editing UI in `app/` or global styles, follow the light editorial system in `docs/theme.md`.
+When editing UI in `app/` or global styles, follow the light editorial tech-journal system in `docs/theme.md`.
 
 ## Colors
 
 | Role | Hex | Token |
 |------|-----|-------|
-| Canvas | `#f2f0eb` | `--color-warm-parchment` |
-| Text | `#292827` | `--color-ink-charcoal` |
-| Muted | `#666666` | `--color-stone-gray` |
-| Border | `#e3e3e2` | `--color-soft-mist` |
-| Card | `#ffffff` | `--color-paper-white` |
-| Link | `#714cb6` | `--color-royal-violet` |
-| Primary CTA | `#421d24` | `--color-midnight-wine` |
-| Secondary fill | `#d4c7ff` | `--color-lilac-mist` |
-| Dark band | `#0c4243` | `--color-deep-lagoon` |
+| Canvas | `#f6f3f1` | `--color-parchment` |
+| Text | `#242424` | `--color-off-black` |
+| Secondary text | `#4e4d4d` | `--color-graphite` |
+| Muted | `#797776` | `--color-smoke` |
+| Border | `#cecac8` | `--color-ash` |
+| Primary CTA | `#2b59d1` | `--color-lake-blue` |
+| Secondary button | `#242424` | `--color-off-black` |
+| Emphasis surface | `#cfdaf5` | `--color-periwinkle-mist` |
+| Announcement bar | `#000000` | `--color-ink` |
 
 ## Rules
 
-1. **Primary button** — wine fill, white label, 16px radius, ~48px tall, weight 460.
-2. **Secondary button** — lilac fill, charcoal text, 1px charcoal border, 8px radius.
-3. **Links** — violet text only; underline on hover (0.2s).
-4. **Headlines** — weight 460 from 28px up; display sizes use negative tracking from theme doc.
-5. **Surfaces** — parchment page background; white cards for elevation only.
-6. **Depth** — no drop shadows on cards; hero floats use translucent white over photography.
-7. **Header** — sticky, blur(12px), soft-mist border when scrolled.
-8. **Forbidden** — pure `#000` / `#fff` page bg, violet button fills, extra accent hues, 700-weight headlines, shadows on cards, deep lagoon on components.
+1. **Primary button** — Lake Blue fill, parchment/white uppercase mono 14px, 100px radius, one per screen.
+2. **Secondary button** — Off-Black fill, same pill treatment.
+3. **Ghost** — 1px Off-Black border, transparent fill, uppercase mono.
+4. **Headlines** — editorial serif weight 400 only (Instrument Serif). Never bold.
+5. **Body / UI** — IBM Plex Mono for all functional text.
+6. **Cards** — 40px radius, 40px padding, 1px Ash border, no drop shadow.
+7. **Forbidden** — white page background, extra chromatic button colors, sans-serif body, pastel as UI fills, card shadows.
 
 ## Implementation
 
-- Centralize tokens in `app/globals.css` (`:root` + Tailwind v4 `@theme`).
-- Font: Inter as substitute for Super Sans VF until custom VF is wired in `layout.tsx`.
-- Max content width 1200px; section spacing 64–96px.
+- Tokens in `app/globals.css` (`:root` + Tailwind v4 `@theme`).
+- Fonts in `app/layout.tsx`: Instrument Serif + IBM Plex Mono.
+- Max content width 1432px; section spacing 64px.
 
-Before shipping UI changes, skim component checklist in @docs/theme.md.
+Before shipping UI changes, skim the checklist in @docs/theme.md.

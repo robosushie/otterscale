@@ -1,0 +1,49 @@
+# Production-style stack: bring your own PostgreSQL (set DATABASE_URL in .env).
+# Bundled Postgres: merge deploy/docker-compose.stack.yml (see pnpm deploy:stack).
+name: otterscale
+
+services:
+  headscale:
+    image: headscale/headscale:0.23.0
+    container_name: headscale
+    hostname: headscale
+    command: serve
+    volumes:
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - ./headscale/policy.hujson:/etc/headscale/policy.hujson:ro
+      - headscale_data:/var/lib/headscale
+      - headscale_run:/var/run/headscale
+    ports:
+      - "8080:8080"
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: app
+    hostname: app
+    env_file:
+      - ../.env
+    ports:
+      - "3000:3000"
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to your PostgreSQL connection string}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to a random string of at least 32 characters}
+      AUTH_OIDC_ENABLED: ${AUTH_OIDC_ENABLED:-false}
+      AUTH_OIDC_ISSUER: ${AUTH_OIDC_ISSUER:-}
+      AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-}
+      AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-}
+      AUTH_LOCAL_AUTH_ENABLED: ${AUTH_LOCAL_AUTH_ENABLED:-true}
+      AUTH_SETUP_TOKEN: ${AUTH_SETUP_TOKEN:-}
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+      HEADSCALE_API_KEY: ${HEADSCALE_API_KEY:-}
+    depends_on:
+      headscale:
+        condition: service_started
+
+volumes:
+  headscale_data:
+  headscale_run:

@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.codegraph
+.cursor
+.claude
+.codex
+.agents
+.antigravity
+**/.env
+**/.env.*
+!.env.example
+coverage
+*.log
+terminals
+agent-transcripts
+docs/external

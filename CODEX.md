@@ -6,51 +6,47 @@ Layer this file with [`AGENTS.md`](./AGENTS.md) (shared policy, Next.js, TypeScr
 
 Canonical theme: [`docs/theme.md`](./docs/theme.md)
 
-Otterscale uses the golden-hour editorial theme (light mode).
+Otterscale uses a light editorial tech-journal theme (parchment canvas, serif headlines, mono UI).
 
 ### Token summary
 
 ```
-canvas:       #f2f0eb  (--color-warm-parchment)
-text:         #292827  (--color-ink-charcoal)
-muted:        #666666  (--color-stone-gray)
-border:       #e3e3e2  (--color-soft-mist)
-card:         #ffffff  (--color-paper-white)
-link:         #714cb6  (--color-royal-violet) — links ONLY
-primary CTA:  #421d24  (--color-midnight-wine) — sole filled chromatic button
-secondary:    #d4c7ff  (--color-lilac-mist) + 1px #292827 border
-dark band:    #0c4243  (--color-deep-lagoon) — full-bleed sections only
+canvas:       #f6f3f1  (--color-parchment)
+text:         #242424  (--color-off-black)
+muted:        #4e4d4d  (--color-graphite)
+helper:       #797776  (--color-smoke)
+border:       #cecac8  (--color-ash)
+primary CTA:  #2b59d1  (--color-lake-blue) — sole chromatic filled button
+secondary:    #242424  (--color-off-black) pill
+emphasis:     #cfdaf5  (--color-periwinkle-mist)
 ```
 
 ### Typography
 
-- Single family: Super Sans VF (`--font-super-sans-vf`); implement with **Inter** until VF is hosted.
-- Weights: 460 (display/headlines/body), 540 (emphasis), 700 (small labels only e.g. 19px product names).
-- Display scale: 64 / 49 / 28 / 26 / 19 / 16 / 14 / 12 — see `docs/theme.md` for line-height and tracking.
+- Headlines: Instrument Serif (`--font-display`), weight 400 only.
+- Body, nav, buttons, labels: IBM Plex Mono (`--font-ui`). Buttons/nav uppercase.
 
 ### Component defaults
 
 | Component | Key styles |
 |-----------|------------|
-| Primary button | `#421d24` bg, white text, 16px radius, h~48, weight 460 |
-| Secondary button | `#d4c7ff` bg, `#292827` text, 8px radius, 1px border |
-| Ghost / nav | Transparent, charcoal, underline on hover |
-| Product card | White, 16px radius, 16px padding, violet learn-more link |
-| Hero float card | White ~85% opacity, 16px radius, no shadow |
-| Header | 64px sticky, blur(12px), border `#e3e3e2` on scroll |
+| Primary button | `#2b59d1` bg, parchment text, 100px radius, uppercase 14px |
+| Secondary button | `#242424` bg, parchment text, 100px radius |
+| Ghost | Transparent, 1px `#242424` border, 100px radius |
+| Card | Parchment, 40px radius, 40px padding, 1px Ash, no shadow |
 
 ### Implementation location
 
-- Tokens: `app/globals.css` — Tailwind v4 `@import "tailwindcss"` + `@theme { ... }`.
-- Fonts: `app/layout.tsx` — load Inter (variable) as `--font-super-sans-vf` fallback.
-- Avoid leaving create-next-app `#171717` / dark `prefers-color-scheme` as the product default.
+- Tokens: `app/globals.css`
+- Fonts: `app/layout.tsx` — Instrument Serif + IBM Plex Mono
 
 ### Hard rejects
 
 - Card elevation shadows.
-- Violet or lilac **primary** filled CTAs (wine only).
-- Bold headlines (700+) at display sizes.
-- Pure black text or pure white page background.
+- Extra chromatic button fills.
+- Bold headlines.
+- Pure white page background.
+- Sans-serif body copy.
 
 When unsure, read `docs/theme.md` before adding new components.
 

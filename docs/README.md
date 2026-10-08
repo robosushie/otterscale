@@ -14,4 +14,4 @@ Otterscale is an open-source, multi-tenant team mesh control platform built on [
 
 **Source spec:** [Otterscale Design Architecture (PDF)](./external/Otterscale_Design_Architecture.pdf) — draft v0.5, 8 Oct 2026.
 
-**Design system:** All product UI follows [theme.md](./theme.md) (warm parchment editorial, Inter until Super Sans VF).
+**Design system:** All product UI follows [theme.md](./theme.md) (parchment canvas, serif headlines, mono UI).
