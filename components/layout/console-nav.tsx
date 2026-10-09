@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { BrandLockup } from "@/components/brand/lockup";
 import type { Capability } from "@/types/roles";
 
 type NavChild = { href: string; label: string; capability: Capability };
@@ -165,7 +166,7 @@ export function ConsoleNav({ capabilities }: { capabilities: Capability[] }) {
 export function ConsoleWordmark({ children }: { children: ReactNode }) {
   return (
     <Link href="/machines" className="flex min-w-0 items-center gap-2 px-2 py-1.5">
-      <span className="font-display text-[20px] tracking-[-0.4px] text-off-black">Otterscale</span>
+      <BrandLockup />
       <span className="truncate text-[13px] text-graphite">{children}</span>
     </Link>
   );

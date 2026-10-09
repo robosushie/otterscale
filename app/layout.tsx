@@ -19,6 +19,14 @@ const ui = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Otterscale",
   description: "Team mesh control platform",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon.ico", type: "image/x-icon" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

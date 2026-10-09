@@ -17,9 +17,17 @@
 }
 
 .console-mark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-display);
   font-size: 18px;
   padding: 8px 10px 12px;
+}
+
+.console-mark img {
+  width: 28px;
+  height: 28px;
 }
 
 .console-group {
