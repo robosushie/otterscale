@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
+import { IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const display = Instrument_Serif({
+const display = Newsreader({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-display-family",

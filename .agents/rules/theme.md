@@ -29,7 +29,7 @@ When editing UI in `app/` or global styles, follow the light editorial tech-jour
 1. **Primary button** — Lake Blue fill, parchment/white uppercase mono 14px, 6px radius, one per screen.
 2. **Secondary button** — Off-Black fill, same 6px radius.
 3. **Ghost** — 1px Off-Black border, transparent fill, uppercase mono.
-4. **Headlines** — editorial serif weight 400 only (Instrument Serif). Never bold.
+4. **Headlines** — editorial serif weight 400 only (Newsreader). Never bold.
 5. **Body / UI** — IBM Plex Mono for all functional text.
 6. **Cards** — 8px radius, 20px padding, 1px Ash border, no drop shadow.
 7. **Console** — left sidebar (240px), single column, no bento grids.
@@ -38,7 +38,7 @@ When editing UI in `app/` or global styles, follow the light editorial tech-jour
 ## Implementation
 
 - Tokens in `app/globals.css` (`:root` + Tailwind v4 `@theme`).
-- Fonts in `app/layout.tsx`: Instrument Serif + IBM Plex Mono.
+- Fonts in `app/layout.tsx`: Newsreader + IBM Plex Mono.
 - Max content width 1432px; sidebar 240px.
 
 Before shipping UI changes, skim the checklist in @docs/theme.md.

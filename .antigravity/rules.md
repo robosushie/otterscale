@@ -14,7 +14,7 @@ Apply [`.agents/rules/theme.md`](../.agents/rules/theme.md) when editing UI.
 
 - Light editorial shell on parchment `#f6f3f1`.
 - Primary actions: Lake Blue `#2b59d1` (one per screen), 6px radius.
-- Headlines: Instrument Serif weight 400; body/UI: IBM Plex Mono.
+- Headlines: Newsreader weight 400; body/UI: IBM Plex Mono.
 - Cards: 8px radius, Ash hairline, no drop shadows. Console uses a left sidebar, not bento grids.
 - Tokens live in `app/globals.css`.
 

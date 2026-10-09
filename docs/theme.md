@@ -53,7 +53,7 @@ This document is the **canonical** design reference for Otterscale. Agent rules 
 
 ## Typography
 
-**Display / headings:** editorial serif (`--font-display`). Substitute in code: **Instrument Serif** via `next/font`. Weight **400** at every size.
+**Display / headings:** editorial serif (`--font-display`). Substitute in code: **Newsreader** via `next/font`. Weight **400** at every size.
 
 **Body / UI:** monospace (`--font-ui`). Substitute: **IBM Plex Mono**. Weights 400 and 500 (500 for emphasized labels). Buttons, nav, badges, tags: uppercase + tight tracking.
 
@@ -163,7 +163,7 @@ Avoid card elevation shadows. Optional ambient only: `--shadow-md: rgba(0, 0, 0,
 
 ## Implementation (Next.js + Tailwind v4)
 
-Tokens live in `app/globals.css` (`:root` + `@theme`). Fonts in `app/layout.tsx`: Instrument Serif → `--font-display`, IBM Plex Mono → `--font-ui`.
+Tokens live in `app/globals.css` (`:root` + `@theme`). Fonts in `app/layout.tsx`: Newsreader → `--font-display`, IBM Plex Mono → `--font-ui`.
 
 ### Quick color reference
 
