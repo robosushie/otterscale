@@ -34,9 +34,7 @@ jobs:
 
       - name: Typecheck
         run: |
-          if [ ! -f next-env.d.ts ]; then
-            printf '%s\n' '/// <reference types="next" />' '/// <reference types="next/image-types/global" />' > next-env.d.ts
-          fi
+          pnpm exec next typegen
           pnpm exec tsc --noEmit
 
       - name: Test
