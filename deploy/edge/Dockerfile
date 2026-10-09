@@ -7,8 +7,10 @@ COPY cmd ./cmd
 COPY internal ./internal
 RUN go build -o /out/proxy ./cmd/proxy
 
-FROM alpine:3.20
+FROM caddy:2-alpine
 RUN apk add --no-cache ca-certificates wget
 COPY --from=build /out/proxy /usr/local/bin/proxy
-EXPOSE 80 4180
-ENTRYPOINT ["/usr/local/bin/proxy"]
+COPY deploy/edge/entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+EXPOSE 80 443 4180
+ENTRYPOINT ["/entrypoint.sh"]

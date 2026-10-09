@@ -99,8 +99,9 @@ export default async function MachinesPage() {
         <Card className="mb-8">
           <h2 className="text-[24px]">Add device</h2>
           <p className="mt-2 text-sm text-graphite">
-            Pick workspaces (required) and tags (optional), then run the printed{" "}
-            <code>tailscale up --login-server --auth-key</code> command.
+            Pick workspaces (required) and tags (optional), then run both printed commands
+            (<code>tailscale logout</code> then <code>tailscale up</code>). Local default login-server is{" "}
+            <code>http://127.0.0.1:8080</code>. Set <code>OTTERSCALE_DOMAIN</code> for production HTTPS.
           </p>
           <div className="mt-4">
             <AuthKeyForm
