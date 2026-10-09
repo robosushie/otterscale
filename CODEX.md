@@ -23,7 +23,7 @@ emphasis:     #cfdaf5  (--color-periwinkle-mist)
 
 ### Typography
 
-- Headlines: Instrument Serif (`--font-display`), weight 400 only.
+- Headlines: Newsreader (`--font-display`), weight 400 only.
 - Body, nav, buttons, labels: IBM Plex Mono (`--font-ui`). Buttons/nav uppercase.
 
 ### Component defaults
@@ -39,7 +39,7 @@ emphasis:     #cfdaf5  (--color-periwinkle-mist)
 ### Implementation location
 
 - Tokens: `app/globals.css`
-- Fonts: `app/layout.tsx` — Instrument Serif + IBM Plex Mono
+- Fonts: `app/layout.tsx` — Newsreader + IBM Plex Mono
 
 ### Hard rejects
 

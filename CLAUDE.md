@@ -15,7 +15,7 @@ All visual work must follow the light editorial theme.
 |---------|------|
 | Page background | `#f6f3f1` parchment |
 | Body / UI text | `#242424` Off-Black, IBM Plex Mono |
-| Headlines | Instrument Serif weight **400** |
+| Headlines | Newsreader weight **400** |
 | Primary CTA | Filled `#2b59d1` Lake Blue, 6px radius (one per screen) |
 | Secondary CTA | Filled `#242424`, 6px radius |
 | Ghost | 1px `#242424` border, transparent |

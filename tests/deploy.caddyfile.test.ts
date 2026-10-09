@@ -13,7 +13,7 @@ describe("deploy Caddyfile", () => {
   });
 
   it("sends published apps to the local tsnet hop", () => {
-    expect(file).toContain("*.apps.localhost");
+    expect(file).toContain("*.{$APPS_BASE_DOMAIN:apps.localhost}");
     expect(file).toContain("reverse_proxy 127.0.0.1:8081");
   });
 });

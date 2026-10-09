@@ -1,0 +1,121 @@
+# Otterscale Stack — pull GHCR images and run Headscale + console + edge.
+# Canonical deploy file for any Docker Compose host (cloud VM, EC2, Lightsail, …).
+#
+#   cp deploy/otterscale-stack.env.example .env
+#   docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d
+#
+# Bootstrap mints HEADSCALE_API_KEY, APPS_EDGE_AUTHKEY, and AUTH_SECRET
+# after Headscale is healthy. Set OTTERSCALE_DOMAIN (and AUTH_URL) in production.
+
+name: otterscale
+
+services:
+  headscale:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/headscale:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: headscale
+    hostname: headscale
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      OTTERSCALE_DOMAIN: ${OTTERSCALE_DOMAIN:-}
+    volumes:
+      - headscale_data:/var/lib/headscale
+      - headscale_run:/var/run/headscale
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/key"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  bootstrap:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/headscale:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: otterscale-bootstrap
+    hostname: bootstrap
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      HEADSCALE_USER: tagged-devices
+    volumes:
+      - headscale_run:/var/run/headscale
+      - otterscale_secrets:/otterscale-secrets
+    entrypoint: ["/bootstrap.sh"]
+    restart: on-failure
+    depends_on:
+      headscale:
+        condition: service_healthy
+
+  app:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/app:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: app
+    hostname: app
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      DATABASE_URL: file:/data/otterscale.db
+      AUTH_URL: ${AUTH_URL:-https://console.localhost}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_OIDC_ISSUER: ${AUTH_OIDC_ISSUER:-}
+      AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-}
+      AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-}
+      AUTH_SETUP_TOKEN: ${AUTH_SETUP_TOKEN:-}
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+      HEADSCALE_PUBLIC_URL: ${HEADSCALE_PUBLIC_URL:-https://hs.localhost}
+      OTTERSCALE_DOMAIN: ${OTTERSCALE_DOMAIN:-}
+      HEADSCALE_API_KEY: ${HEADSCALE_API_KEY:-}
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      APPS_PROBE_URL: http://edge:4180
+    volumes:
+      - otterscale_data:/data
+      - apps_caddy_config:/data/apps-caddy
+      - otterscale_secrets:/otterscale-secrets:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  edge:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/edge:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: edge
+    hostname: edge
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+      APPS_EDGE_AUTHKEY: ${APPS_EDGE_AUTHKEY:-}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_HOSTNAME: edge
+      LISTEN_ADDR: 127.0.0.1:8081
+      PROBE_ADDR: :4180
+      CONSOLE_HOST: ${CONSOLE_HOST:-console.localhost}
+      HS_HOST: ${HS_HOST:-hs.localhost}
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - apps_proxy_state:/var/lib/tailscale
+      - apps_caddy_config:/data/apps-caddy
+      - otterscale_secrets:/otterscale-secrets:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4180/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
+volumes:
+  headscale_data:
+  headscale_run:
+  otterscale_data:
+  otterscale_secrets:
+  caddy_data:
+  caddy_config:
+  apps_caddy_config:
+  apps_proxy_state:
