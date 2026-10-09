@@ -1,19 +1,21 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
 export const controlClassName =
-  "mt-1 h-9 w-full rounded-[100px] border border-ash bg-parchment px-3.5 text-[13px] font-normal tracking-[-0.28px] text-off-black placeholder:text-smoke";
+  "mt-1 h-9 w-full rounded-[6px] border border-ash bg-parchment px-3.5 text-[13px] font-normal tracking-[-0.28px] text-off-black placeholder:text-smoke";
 
 export function Field({
   label,
   hint,
   children,
+  className = "",
 }: {
   label: string;
   hint?: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <label className="flex flex-col text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black">
+    <label className={`flex flex-col text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black ${className}`}>
       {label}
       {children}
       {hint ? <span className="mt-1 text-[12px] font-normal normal-case tracking-[-0.4px] text-smoke">{hint}</span> : null}

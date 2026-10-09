@@ -1,8 +1,7 @@
-import { auth, signIn } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { getAuthMethodsPublic } from "@/lib/auth/methods";
 import { hasOwner } from "@/lib/auth/owner";
 import { getServerEnv } from "@/lib/env";
@@ -14,7 +13,7 @@ export const instant = false;
 export default async function SetupPage() {
   await connection();
   const session = await auth();
-  if (session?.user) redirect("/workspace");
+  if (session?.user) redirect("/machines");
   if (await hasOwner()) redirect("/signin");
 
   const methods = getAuthMethodsPublic();
@@ -27,30 +26,14 @@ export default async function SetupPage() {
         <h1>Set up Otterscale</h1>
         <p className="mt-4 text-graphite">Create the first Owner account</p>
         <hr className="mt-6 border-0 border-t border-ash" />
-        {methods.localAuthEnabled && (
-          <LocalAccountForm
-            action={setupOwnerAccount}
-            prepareTotp={generateSetupTotpSecret}
-            submitLabel="Create Owner account"
-            showSetupToken={needsSetupToken}
-          />
-        )}
-        {methods.oidcEnabled && (
-          <div className={methods.localAuthEnabled ? "mt-8 border-t border-ash pt-8" : "mt-6"}>
-            <p className="text-sm text-graphite">Or use SSO for the first Owner sign-in.</p>
-            <form
-              className="mt-4"
-              action={async () => {
-                "use server";
-                await signIn("oidc", { redirectTo: "/workspace" });
-              }}
-            >
-              <Button type="submit" variant="secondary">
-                Continue with SSO
-              </Button>
-            </form>
-          </div>
-        )}
+        <LocalAccountForm
+          action={setupOwnerAccount}
+          prepareTotp={generateSetupTotpSecret}
+          submitLabel="Create Owner account"
+          showSetupToken={needsSetupToken}
+          oidcEnabled={methods.oidcEnabled}
+          googleOidcEnabled={methods.googleOidcEnabled}
+        />
       </Card>
     </main>
   );

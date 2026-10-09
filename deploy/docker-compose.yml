@@ -1,5 +1,6 @@
-# Production-style stack: bring your own PostgreSQL (set DATABASE_URL in .env).
-# Bundled Postgres: merge deploy/docker-compose.stack.yml (see pnpm deploy:stack).
+# Console + Headscale behind Caddy (TLS on console.localhost / hs.localhost / *.apps.localhost).
+# SQLite for the Next.js app lives on the otterscale_data volume.
+# proxy is a Go tsnet node (hostname edge / tag:edge) that reverse-proxies published apps.
 name: otterscale
 
 services:
@@ -7,14 +8,16 @@ services:
     image: headscale/headscale:0.23.0
     container_name: headscale
     hostname: headscale
+    # Windows Tailscale resolves its coordination server itself and cannot look up
+    # *.localhost. Bind Headscale on loopback so this PC can use http://127.0.0.1:8080.
+    ports:
+      - "127.0.0.1:8080:8080"
     command: serve
     volumes:
       - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
       - ./headscale/policy.hujson:/etc/headscale/policy.hujson:ro
       - headscale_data:/var/lib/headscale
       - headscale_run:/var/run/headscale
-    ports:
-      - "8080:8080"
 
   app:
     build:
@@ -24,22 +27,66 @@ services:
     hostname: app
     env_file:
       - ../.env
-    ports:
-      - "3000:3000"
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to your PostgreSQL connection string}
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      DATABASE_URL: file:/data/otterscale.db
+      AUTH_URL: ${AUTH_URL:-https://console.localhost}
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to a random string of at least 32 characters}
-      AUTH_OIDC_ENABLED: ${AUTH_OIDC_ENABLED:-false}
       AUTH_OIDC_ISSUER: ${AUTH_OIDC_ISSUER:-}
       AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-}
       AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-}
-      AUTH_LOCAL_AUTH_ENABLED: ${AUTH_LOCAL_AUTH_ENABLED:-true}
       AUTH_SETUP_TOKEN: ${AUTH_SETUP_TOKEN:-}
       HEADSCALE_INTERNAL_URL: http://headscale:8080
+      HEADSCALE_PUBLIC_URL: ${HEADSCALE_PUBLIC_URL:-https://hs.localhost}
       HEADSCALE_API_KEY: ${HEADSCALE_API_KEY:-}
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      APPS_PROBE_URL: http://proxy:4180
+    volumes:
+      - otterscale_data:/data
+      - apps_caddy_config:/data/apps-caddy
+    depends_on:
+      headscale:
+        condition: service_started
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    hostname: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - headscale
+
+  proxy:
+    build:
+      context: ..
+      dockerfile: deploy/proxy/Dockerfile
+    container_name: proxy
+    hostname: proxy
+    environment:
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+      APPS_EDGE_AUTHKEY: ${APPS_EDGE_AUTHKEY:-}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_HOSTNAME: edge
+    volumes:
+      # Fresh tsnet state (do not reuse the old tailscaled apps_edge_state volume).
+      - apps_proxy_state:/var/lib/tailscale
+      - apps_caddy_config:/data/apps-caddy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4180/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
     depends_on:
       headscale:
         condition: service_started
@@ -47,3 +94,8 @@ services:
 volumes:
   headscale_data:
   headscale_run:
+  otterscale_data:
+  caddy_data:
+  caddy_config:
+  apps_caddy_config:
+  apps_proxy_state:

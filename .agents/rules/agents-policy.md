@@ -18,7 +18,7 @@ Follow [`AGENTS.md`](../../AGENTS.md) at the repo root for Next.js guidance, Ott
 
 - **No secrets in git** — `.env`, keys, tokens stay local or in the host secret store.
 - **No invented infra** — do not add CDK, Terraform, K8s manifests, or deployment topology unless the user asks or the task is explicitly in `docs/deployment.md` / roadmap.
-- **Auth/config fail loud** — if OIDC or required env vars are missing, error at startup or API boundary; no silent “guest mode” or fake logged-in UI.
+- **Auth/config fail loud** — `DATABASE_URL` and `AUTH_SECRET` must be set or startup fails. Local auth is always on (no silent guest UI). Incomplete OIDC credentials disable SSO buttons; they do not fail boot.
 - **UI** — [`docs/theme.md`](../../docs/theme.md) for all product surfaces.
 - **Commits** — only when the user asks; [git-commits.md](./git-commits.md).
 - **Migrations** — edit `prisma/schema.prisma` only; run `pnpm db:make -- <name>`; never hand-write SQL under `prisma/migrations/` ([database-migrations.md](./database-migrations.md)).

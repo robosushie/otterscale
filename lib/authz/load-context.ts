@@ -1,14 +1,17 @@
-import { prisma } from "@/lib/db";
+import { prisma, sqliteReady } from "@/lib/db";
 import { resolveCapabilities } from "@/lib/authz/permissions";
 import type { UserCapabilities } from "@/types/roles";
+
 export async function loadUserCapabilities(
   userId: string,
 ): Promise<UserCapabilities | null> {
+  await sqliteReady;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       platformMemberships: true,
       tenantMemberships: { orderBy: { createdAt: "asc" }, take: 1 },
+      workspaceMemberships: true,
     },
   });
   if (!user) return null;
@@ -19,22 +22,32 @@ export async function loadUserCapabilities(
   const implicit = org?.settings?.superAdminsImplicitTenantAdmin ?? true;
 
   const platformRoles = user.platformMemberships.map((m) => m.role as "OWNER" | "SUPER_ADMIN");
+  const isPlatformAdmin = platformRoles.includes("OWNER") || platformRoles.includes("SUPER_ADMIN");
   const tenantMembership = user.tenantMemberships[0];
-  const tenantRole = tenantMembership?.role ?? null;
+  const tenantRole = (tenantMembership?.role ?? null) as UserCapabilities["tenantRole"];
 
   const capabilities = resolveCapabilities({
     platformRoles,
-    tenantRole: tenantRole as UserCapabilities["tenantRole"],
+    tenantRole,
     superAdminsImplicitTenantAdmin: implicit,
   });
+
+  const workspaceIds = isPlatformAdmin
+    ? (await prisma.group.findMany({ where: { organizationId: org?.id }, select: { id: true } })).map(
+        (g) => g.id,
+      )
+    : user.workspaceMemberships.map((m) => m.groupId);
 
   return {
     userId: user.id,
     email: user.email,
+    name: user.name,
     platformRoles,
-    tenantRole: tenantRole as UserCapabilities["tenantRole"],
+    tenantRole,
     capabilities,
     isOwner: platformRoles.includes("OWNER"),
+    isPlatformAdmin,
+    workspaceIds,
   };
 }
 
@@ -49,5 +62,4 @@ export async function requireCapability(
   return ctx;
 }
 
-/** Alias used by console pages. */
 export const loadAuthzContext = loadUserCapabilities;

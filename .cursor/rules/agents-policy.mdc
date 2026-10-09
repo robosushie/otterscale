@@ -15,7 +15,7 @@ Non-negotiables:
 
 - Read `node_modules/next/dist/docs/` before changing framework behavior
 - No secrets in git; no inventing infra/CDK/deploy unless asked
-- Missing OIDC/required env → fail loud (no silent auth fallback UI)
+- Required env (`DATABASE_URL`, `AUTH_SECRET`) fail loud; local auth always on; incomplete OIDC disables SSO buttons only
 - Product UI → `docs/theme.md`
 - Commits only when the user asks → `git-commits.mdc`
 - Schema changes → `pnpm db:make -- <name>` only; never edit `prisma/migrations/` by hand

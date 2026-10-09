@@ -3,7 +3,8 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
 import { ensureOwnerBootstrap } from "@/lib/auth/bootstrap";
-import { isLocalAuthEnabled, isOidcEnabled, useJwtSessions } from "@/lib/auth/methods";
+import { redeemStashedInvite } from "@/lib/auth/redeem-invite";
+import { isOidcEnabled, jwtSessionsEnabled } from "@/lib/auth/methods";
 import { verifyPassword } from "@/lib/auth/password";
 import { verifyStoredTotp } from "@/lib/auth/totp";
 import { uniqueUsernameFromEmail } from "@/lib/auth/username";
@@ -29,7 +30,6 @@ function buildOidcProvider() {
 }
 
 function buildCredentialsProvider() {
-  if (!isLocalAuthEnabled()) return null;
   return Credentials({
     id: "credentials",
     name: "Credentials",
@@ -47,7 +47,11 @@ function buildCredentialsProvider() {
       const rl = checkRateLimit(`login:${username}`, 20, 15 * 60 * 1000);
       if (!rl.allowed) return null;
 
-      const user = await prisma.user.findUnique({ where: { username } });
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [{ username }, { email: username.toLowerCase() }],
+        },
+      });
       if (!user?.passwordHash) return null;
 
       const ok = await verifyPassword(password, user.passwordHash);
@@ -57,9 +61,7 @@ function buildCredentialsProvider() {
       if (!authSecret || authSecret.length < 32) return null;
 
       if (user.totpEnabled && user.totpSecret) {
-        if (!totpCode) {
-          throw new Error("TOTP_REQUIRED");
-        }
+        if (!totpCode) return null;
         if (!verifyStoredTotp(user.totpSecret, totpCode, authSecret)) {
           return null;
         }
@@ -99,14 +101,14 @@ const providers = [buildOidcProvider(), buildCredentialsProvider()].filter(
 
 if (providers.length === 0) {
   throw new Error(
-    "No auth providers configured. Enable AUTH_OIDC_ENABLED and/or AUTH_LOCAL_AUTH_ENABLED with valid credentials.",
+    "No auth providers configured. Local credentials must always be available.",
   );
 }
 
 export const authConfig: NextAuthConfig = {
   adapter,
   providers,
-  session: { strategy: useJwtSessions() ? "jwt" : "database" },
+  session: { strategy: jwtSessionsEnabled() ? "jwt" : "database" },
   pages: {
     signIn: "/signin",
   },
@@ -133,6 +135,8 @@ export const authConfig: NextAuthConfig = {
           });
         }
         await ensureOwnerBootstrap(user.id, user.email);
+        const inviteOk = await redeemStashedInvite(user.id, user.email);
+        if (!inviteOk) return "/signin?signup=1&error=InviteEmailMismatch";
       }
       return true;
     },

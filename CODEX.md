@@ -17,7 +17,7 @@ muted:        #4e4d4d  (--color-graphite)
 helper:       #797776  (--color-smoke)
 border:       #cecac8  (--color-ash)
 primary CTA:  #2b59d1  (--color-lake-blue) — sole chromatic filled button
-secondary:    #242424  (--color-off-black) pill
+secondary:    #242424  (--color-off-black)
 emphasis:     #cfdaf5  (--color-periwinkle-mist)
 ```
 
@@ -30,10 +30,11 @@ emphasis:     #cfdaf5  (--color-periwinkle-mist)
 
 | Component | Key styles |
 |-----------|------------|
-| Primary button | `#2b59d1` bg, parchment text, 100px radius, uppercase 14px |
-| Secondary button | `#242424` bg, parchment text, 100px radius |
-| Ghost | Transparent, 1px `#242424` border, 100px radius |
-| Card | Parchment, 40px radius, 40px padding, 1px Ash, no shadow |
+| Primary button | `#2b59d1` bg, parchment text, 6px radius, uppercase 14px |
+| Secondary button | `#242424` bg, parchment text, 6px radius |
+| Ghost | Transparent, 1px `#242424` border, 6px radius |
+| Card | Paper, 8px radius, 20px padding, 1px Ash, no shadow |
+| Console | Left sidebar 240px, single column |
 
 ### Implementation location
 

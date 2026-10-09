@@ -1,7 +1,7 @@
 # Otterscale design theme (editorial tech journal)
 
 **Theme mode:** light only for product UI  
-**Vibe:** Warm parchment canvas, serif headlines at weight 400, monospace UI, one Lake Blue primary action, pill buttons, hairline Ash borders.
+**Vibe:** Warm parchment canvas, serif headlines at weight 400, monospace UI, one Lake Blue primary action, tight-radius controls, hairline Ash borders.
 
 This document is the **canonical** design reference for Otterscale. Agent rules in `.cursor/rules/`, `CLAUDE.md`, `CODEX.md`, and `.agents/rules/` summarize this file for tooling.
 
@@ -14,7 +14,8 @@ This document is the **canonical** design reference for Otterscale. Agent rules 
 - **Lake Blue** (`#2b59d1`) is the **only** chromatic filled primary button — one per screen.
 - Headlines use an editorial **serif at weight 400** — never bold.
 - Body, nav, buttons, labels, and all functional UI use **monospace**.
-- Buttons and tags are **pills** (100px / 9999px radius). Cards are **40px** radius with **40px** padding.
+- Buttons and inputs use **6px** radius. Cards and tables use **8px** radius and **20px** padding. Status tags may stay fully rounded (9999px).
+- Console chrome is a **left sidebar** plus a single-column main (title, one-line description, table/list). Do not use bento / two-column card grids.
 - Depth from 1px Ash borders and parchment vs periwinkle contrast — not drop shadows on cards.
 - Pastel stops (sky, mint, coral, gold, crimson) are **decorative washes only**, never UI fills.
 
@@ -78,7 +79,8 @@ The pairing is the identity: serif announces, mono instructs. Do not put heading
 - **Base unit:** 8px
 - **Page max-width:** 1432px
 - **Section gap:** 64px
-- **Card padding:** 40px
+- **Card padding:** 20px
+- **Sidebar width:** 240px
 - **Element gap:** 16px
 
 Scale: 8, 16, 24, 32, 40, 64, 72, 80.
@@ -87,9 +89,9 @@ Scale: 8, 16, 24, 32, 40, 64, 72, 80.
 
 | Element | Radius |
 |---------|--------|
-| tags, pills | 9999px |
-| buttons | 100px |
-| cards | 40px |
+| status tags | 9999px |
+| buttons, inputs | 6px |
+| cards, tables | 8px |
 
 ### Shadows
 
@@ -99,37 +101,38 @@ Avoid card elevation shadows. Optional ambient only: `--shadow-md: rgba(0, 0, 0,
 
 ## Components (implementation checklist)
 
-### Primary pill (Lake Blue)
+### Primary button (Lake Blue)
 
-- Fill `#2b59d1`, text parchment/white, IBM Plex Mono 14px **uppercase**, radius 100px
-- Padding 16px 32px, height ~48px
+- Fill `#2b59d1`, text parchment/white, IBM Plex Mono 14px **uppercase**, radius 6px
+- Padding ~8px 16px, height ~36px
 - Optional trailing ▸
 - **Only** saturated fill in the system — one primary per screen
 
-### Secondary pill (Off-Black)
+### Secondary button (Off-Black)
 
 - Fill `#242424`, white/parchment text, same type and radius as primary, no arrow
 
-### Ghost pill
+### Ghost button
 
-- Transparent, 1px `#242424` border, Off-Black uppercase mono 14px, radius 100px, padding 16px 32px
+- Transparent, 1px `#242424` border, Off-Black uppercase mono 14px, radius 6px
 
 ### Feature card
 
-- Parchment (or transparent) fill, 1px Ash border, 40px radius, 40px padding
+- Paper fill, 1px Ash border, 8px radius, 20px padding
 - Title: serif 24px / 400 / Off-Black
 - Body: mono 16px / Graphite
 - No drop shadow
 
 ### Elevated card (Periwinkle)
 
-- `#cfdaf5` fill, 40px radius, 40px padding — the one colored card that draws the eye
+- `#cfdaf5` fill, 8px radius, 20px padding — the one colored card that draws the eye
 
-### Navigation
+### Console navigation
 
-- Parchment/transparent, ~80px height
-- Wordmark left; nav links IBM Plex Mono 18px uppercase Off-Black
-- Right: ghost Login + Lake Blue primary
+- Fixed left sidebar, 240px, parchment, 1px Ash right border
+- Sentence-case IBM Plex Mono links; active row uses an Ash wash
+- Collapsible groups (Network, Access controls, Logs); user identity at the bottom
+- Mobile: 56px top bar with a menu control that opens the same nav
 
 ### Announcement bar
 
@@ -143,7 +146,7 @@ Avoid card elevation shadows. Optional ambient only: `--shadow-md: rgba(0, 0, 0,
 
 - Serif weight 400 for all headings; tracking about −0.02em.
 - Monospace for every functional string (body, buttons, nav, tags).
-- Pill radius on buttons/tags; 40px cards.
+- 6px buttons/inputs; 8px cards; single-column console with a left sidebar.
 - Parchment canvas; Ash 1px borders.
 - One Lake Blue primary action per screen.
 
@@ -153,7 +156,7 @@ Avoid card elevation shadows. Optional ambient only: `--shadow-md: rgba(0, 0, 0,
 - Pure white page background.
 - Lake Blue on anything except the primary CTA.
 - Sans-serif body copy.
-- Card drop shadows; sharp radii under 16px on cards or under 100px on buttons.
+- Card drop shadows; 40px card radii or 100px pill buttons in the console.
 - Pastels as functional UI fills.
 
 ---

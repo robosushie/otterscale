@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-function envBool(value: string | undefined, defaultValue: boolean): boolean {
-  if (value === undefined || value === "") return defaultValue;
-  return value === "true" || value === "1";
-}
-
 function emptyToUndef(value: string | undefined): string | undefined {
   if (value === undefined || value.trim() === "") return undefined;
   return value;
@@ -14,14 +9,16 @@ const baseSchema = z.object({
   DATABASE_URL: z.string().min(1),
   AUTH_SECRET: z.string().min(32),
   AUTH_URL: z.string().url().optional(),
-  AUTH_OIDC_ENABLED: z.boolean(),
   AUTH_OIDC_ISSUER: z.string().url().optional(),
   AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
   AUTH_OIDC_CLIENT_SECRET: z.string().min(1).optional(),
-  AUTH_LOCAL_AUTH_ENABLED: z.boolean(),
   AUTH_SETUP_TOKEN: z.string().min(1).optional(),
   HEADSCALE_INTERNAL_URL: z.string().url().optional(),
+  HEADSCALE_PUBLIC_URL: z.string().url().optional(),
   HEADSCALE_API_KEY: z.string().optional(),
+  APPS_BASE_DOMAIN: z.string().min(1).optional(),
+  APPS_ROUTES_PATH: z.string().min(1).optional(),
+  APPS_PROBE_URL: z.string().url().optional(),
 });
 
 export type ServerEnv = z.infer<typeof baseSchema>;
@@ -29,48 +26,31 @@ export type ServerEnv = z.infer<typeof baseSchema>;
 let cached: ServerEnv | null = null;
 
 function parseRawEnv(): ServerEnv {
-  const oidcEnabled = envBool(process.env.AUTH_OIDC_ENABLED, true);
-  const localEnabled = envBool(process.env.AUTH_LOCAL_AUTH_ENABLED, true);
-
   const raw = {
     DATABASE_URL: process.env.DATABASE_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_URL: emptyToUndef(process.env.AUTH_URL),
-    AUTH_OIDC_ENABLED: oidcEnabled,
     AUTH_OIDC_ISSUER: emptyToUndef(process.env.AUTH_OIDC_ISSUER),
     AUTH_OIDC_CLIENT_ID: emptyToUndef(process.env.AUTH_OIDC_CLIENT_ID),
     AUTH_OIDC_CLIENT_SECRET: emptyToUndef(process.env.AUTH_OIDC_CLIENT_SECRET),
-    AUTH_LOCAL_AUTH_ENABLED: localEnabled,
     AUTH_SETUP_TOKEN: emptyToUndef(process.env.AUTH_SETUP_TOKEN),
     HEADSCALE_INTERNAL_URL: emptyToUndef(process.env.HEADSCALE_INTERNAL_URL),
+    HEADSCALE_PUBLIC_URL: emptyToUndef(process.env.HEADSCALE_PUBLIC_URL),
     HEADSCALE_API_KEY: emptyToUndef(process.env.HEADSCALE_API_KEY),
+    APPS_BASE_DOMAIN: emptyToUndef(process.env.APPS_BASE_DOMAIN),
+    APPS_ROUTES_PATH: emptyToUndef(process.env.APPS_ROUTES_PATH),
+    APPS_PROBE_URL: emptyToUndef(process.env.APPS_PROBE_URL),
   };
 
   const parsed = baseSchema.safeParse(raw);
   if (!parsed.success) {
     const missing = parsed.error.issues.map((i) => i.path.join(".")).join(", ");
     throw new Error(
-      `Missing or invalid environment variables: ${missing}. Copy .env.example and configure auth and DATABASE_URL.`,
+      `Missing or invalid environment variables: ${missing}. Copy .env.example and configure AUTH_SECRET and DATABASE_URL.`,
     );
   }
 
-  const env = parsed.data;
-
-  if (!env.AUTH_OIDC_ENABLED && !env.AUTH_LOCAL_AUTH_ENABLED) {
-    throw new Error(
-      "At least one of AUTH_OIDC_ENABLED or AUTH_LOCAL_AUTH_ENABLED must be true.",
-    );
-  }
-
-  if (env.AUTH_OIDC_ENABLED) {
-    if (!env.AUTH_OIDC_ISSUER || !env.AUTH_OIDC_CLIENT_ID || !env.AUTH_OIDC_CLIENT_SECRET) {
-      throw new Error(
-        "AUTH_OIDC_ISSUER, AUTH_OIDC_CLIENT_ID, and AUTH_OIDC_CLIENT_SECRET are required when AUTH_OIDC_ENABLED is true.",
-      );
-    }
-  }
-
-  return env;
+  return parsed.data;
 }
 
 export function getServerEnv(): ServerEnv {

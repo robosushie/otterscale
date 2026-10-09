@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { CheckMenu } from "@/components/ui/check-menu";
 import { controlClassName } from "@/components/ui/field";
 import type { CreateInviteResult } from "@/lib/actions/members";
 import { createUserInvite, revokeUserInvite } from "@/lib/actions/members";
@@ -11,63 +12,88 @@ type PendingInvite = {
   email: string;
   username: string;
   tenantRole: string;
+  platformRole: string | null;
   expiresAt: Date;
 };
 
-export function InvitePanel({ pendingInvites }: { pendingInvites: PendingInvite[] }) {
+function roleLabel(invite: PendingInvite) {
+  if (invite.platformRole === "SUPER_ADMIN") return "Super admin";
+  if (invite.tenantRole === "ADMIN") return "Admin";
+  return "Member";
+}
+
+export function InvitePanel({
+  pendingInvites,
+  workspaces,
+  canAssignSuperAdmin,
+}: {
+  pendingInvites: PendingInvite[];
+  workspaces: { id: string; name: string }[];
+  canAssignSuperAdmin: boolean;
+}) {
   const [lastInvite, setLastInvite] = useState<CreateInviteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuKey, setMenuKey] = useState(0);
   const [pending, startTransition] = useTransition();
 
-  function onCreate(formData: FormData) {
+  function onCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     setError(null);
     setLastInvite(null);
     startTransition(async () => {
-      try {
-        const result = await createUserInvite(formData);
-        setLastInvite(result);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to create invite");
+      const result = await createUserInvite(formData);
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      setLastInvite(result.data);
+      form.reset();
+      setMenuKey((key) => key + 1);
     });
   }
 
   return (
     <div>
-      <form action={onCreate} className="mt-4 grid gap-3 md:grid-cols-4">
+      <form onSubmit={onCreate} className="mt-4 flex flex-wrap items-end gap-3">
         <input
           name="email"
           type="email"
           placeholder="email@example.com"
-          className={`${controlClassName} mt-0`}
+          className={`${controlClassName} mt-0 w-56`}
           required
         />
         <input
           name="username"
           placeholder="username"
-          className={`${controlClassName} mt-0`}
+          className={`${controlClassName} mt-0 w-40`}
           required
         />
-        <select name="tenantRole" className={`${controlClassName} mt-0`} defaultValue="MEMBER">
+        <select name="role" className={`${controlClassName} mt-0 w-40`} defaultValue="MEMBER">
+          {canAssignSuperAdmin ? <option value="SUPER_ADMIN">Super admin</option> : null}
+          <option value="ADMIN">Admin</option>
           <option value="MEMBER">Member</option>
-          <option value="TENANT_ADMIN">Tenant admin</option>
-          <option value="NET_ADMIN">Net admin</option>
-          <option value="AUDITOR">Auditor</option>
         </select>
+        <div className="w-56">
+          <CheckMenu
+            key={menuKey}
+            name="workspaceIds"
+            placeholder="Workspaces"
+            options={workspaces.map((workspace) => ({ id: workspace.id, label: workspace.name }))}
+          />
+        </div>
         <Button type="submit" variant="secondary" disabled={pending}>
           Create invite
         </Button>
       </form>
       {error && <p className="mt-2 text-sm">{error}</p>}
       {lastInvite && (
-        <div className="mt-4 rounded-[40px] border border-ash bg-periwinkle-mist p-6 text-sm">
-          <p className="font-[540]">Copy this invite code now — it won&apos;t be shown again.</p>
+        <div className="mt-4 rounded-[8px] border border-ash bg-periwinkle-mist p-4 text-sm">
+          <p className="font-[540]">Copy this invite code now. It will not be shown again.</p>
           <p className="mt-2 break-all font-mono">{lastInvite.code}</p>
-          <p className="mt-2">
-            Link:{" "}
-            <a href={lastInvite.acceptPath} className="link">
-              {lastInvite.acceptPath}
-            </a>
+          <p className="mt-2 text-graphite">
+            On the sign-in page, choose Create account and enter this code.
           </p>
         </div>
       )}
@@ -76,10 +102,19 @@ export function InvitePanel({ pendingInvites }: { pendingInvites: PendingInvite[
           {pendingInvites.map((inv) => (
             <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-ash py-2">
               <span>
-                {inv.email} · @{inv.username} · {inv.tenantRole} · expires{" "}
+                {inv.email} · @{inv.username} · {roleLabel(inv)} · expires{" "}
                 {new Date(inv.expiresAt).toLocaleDateString()}
               </span>
-              <form action={revokeUserInvite}>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const formData = new FormData(event.currentTarget);
+                  startTransition(async () => {
+                    const result = await revokeUserInvite(formData);
+                    if (!result.ok) setError(result.error);
+                  });
+                }}
+              >
                 <input type="hidden" name="inviteId" value={inv.id} />
                 <Button type="submit" variant="secondary" className="!min-h-0 !py-1 text-xs">
                   Revoke

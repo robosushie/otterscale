@@ -8,9 +8,9 @@ Reference: [design specification PDF](./external/Otterscale_Design_Architecture.
 
 ### Current implementation (Phase 1–2, single tenant)
 
-The shipping control plane is a **Next.js 16** app with **Prisma 6** on PostgreSQL (`DATABASE_URL`). One organisation, one Headscale instance (optional in dev), environments as tags, policy compiler, audit hash chain, and RBAC (Owner / super admin / tenant roles). Auth: **Auth.js** with generic OIDC and optional **local credentials + TOTP**. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
+The shipping control plane is a **Next.js 16** app with **Prisma 6** on SQLite (`DATABASE_URL`). One organisation, one Headscale instance (optional in dev), **workspaces as the isolation unit** (Headscale ACL groups), **tags** as orthogonal ACL labels, policy compiler, audit hash chain, and RBAC (**Owner / Super admin / Admin / Member**). Auth: **Auth.js** with **local credentials + TOTP always on**; generic OIDC enables automatically when issuer, client id, and client secret are all set. The console sidebar is Network (Machines, Apps), Users, Access controls (Workspaces, Policies), Audit (System / Network logs), and Settings (General, User management, Device management, Policy file, Keys). Prisma stores ACL **groups** as workspaces. **Network Apps** are published through one `proxy` container: a Go `tsnet` node (hostname `edge` / `tag:edge`) that reverse-proxies on `:80` and answers TCP probes on `:4180`. Public Caddy forwards `*.apps.localhost` to `proxy:80`. `headscale/headscale` is the coordination server. This is not Tailscale Funnel. Billing, Funnel, Mullvad, and Tailnet Lock are out of Phase 1–2. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
 
-Code layout: `app/` (routes), `components/`, `lib/` (`headscale/` adapter only for Headscale HTTP), `prisma/`, `deploy/`.
+Code layout: `app/` (routes), `components/`, `lib/` (`headscale/` adapter only for Headscale HTTP), `cmd/proxy` (Go tsnet Network Apps hop), `internal/appsproxy/`, `prisma/`, `deploy/`.
 
 ---
 
@@ -111,7 +111,7 @@ flowchart TB
 
 Pipeline:
 
-1. Load intent: groups, environments (tags), rules, active grants, share-link constraints
+1. Load intent: workspaces (ACL groups), tags, extra rules, published-app destinations, active grants, share-link constraints
 2. Lint (wildcards, empty groups, tag owners)
 3. Emit HuJSON + generated `tests` block
 4. Run Headscale policy check (adapter)
@@ -175,14 +175,14 @@ flowchart TB
   end
 
   subgraph tenant_a [Tenant A Headscale instance]
-    EA[Environments as tags]
-    GA[Groups and rules]
+    EA[Workspaces as ACL groups]
+    GA[Tags and extra rules]
     DA[Devices]
   end
 
   subgraph tenant_b [Tenant B Headscale instance]
-    EB[Environments]
-    GB[Groups]
+    EB[Workspaces]
+    GB[Tags]
     DB[Devices]
   end
 
@@ -197,12 +197,13 @@ flowchart TB
 1. **One organisation:** tenants as spaces (prod, uat, dev); super admins may have implicit tenant-admin on single-org installs.
 2. **MSP / hosted:** tenant = customer org; super admin tenant access off by default; support sessions consented.
 
-**Environments:**
+**Workspaces and tags:**
 
-- **Soft (default):** `tag:prod|uat|dev` + ACL/grants; tag owners control assignment
-- **Strict (optional):** prod = dedicated Headscale instance; users switch accounts in official app
+- **Workspace (isolation):** Headscale ACL group plus `tag:ws-{slug}` on member nodes. Same-workspace humans and nodes `accept *:*`. Owner and Super admin are implicit members of every workspace and see all machines.
+- **Tags (labels):** org-scoped `tag:prod`, `tag:uat`, `tag:dev`, or custom. Orthogonal to isolation. `tagOwners` includes `tagged-devices` and platform admin emails so tagged auth keys work.
+- **Strict isolation (later):** a dedicated Headscale instance, not a tag.
 
-**Groups and visibility:** Rules grant group → environment/device access. Console device list filtered to match policy; integration tests must confirm netmap peer visibility [verify].
+**Visibility:** Console machine list is filtered to workspaces the viewer belongs to (Owner/SA: all). Extra Policies rules are optional; default is workspace isolation.
 
 **IP planning:** Non-overlapping CGNAT prefix per tenant instance (e.g. /20 each).
 
@@ -212,13 +213,11 @@ flowchart TB
 
 | Role | Scope | Notes |
 |------|-------|-------|
-| Owner | Platform | Exactly one; adds super admins; platform settings |
-| Super admin | Platform | Tenants lifecycle, upgrades, relays; cannot add super admins |
-| Tenant admin | One tenant | Users, policy, approvals, devices |
-| Net admin | Tenant (env-scoped) | Rules, keys, devices for assigned envs |
-| Auditor | Tenant | Read audit + exports |
-| Member | Tenant | Own devices, requests, share own devices |
-| Guest | One device | Via share link |
+| Owner | Platform | Exactly one; immutable; all workspaces; adds super admins; platform settings |
+| Super admin | Platform | All workspaces; limited platform (cannot add Owner) |
+| Admin | Workspace | Manage that workspace, keys, devices, extra policy |
+| Member | Workspace | See machines in workspaces they belong to |
+| Guest | One device | Via share link (later) |
 
 Platform actions that touch a tenant are mirrored into that tenant’s audit log.
 
@@ -300,8 +299,9 @@ Current repo: Next.js scaffold for console shell; backend services to be added p
 
 ```
 otterscale/
-  cmd/           platform, worker, orchestrator, otter, operator
+  cmd/           proxy (tsnet Network Apps hop); later platform, worker, orchestrator, otter, operator
   internal/
+    appsproxy/   reverse proxy, probe, JSON route table
     headscale/   API adapter only
     policy/      compiler, linter, tests
     access/      requests, grants, share links, reaper

@@ -1,6 +1,6 @@
 # Otterscale product overview
 
-**Otterscale** is an open-source control platform for team mesh networking: multi-tenant spaces, environments, groups, approval-based access, audit, and automation—built on **Headscale**, consumed with **official Tailscale clients** (no custom app).
+**Otterscale** is an open-source control platform for team mesh networking: workspaces as the isolation unit, tags as labels, four roles (Owner / Super admin / Admin / Member), audit, Network Apps (Go tsnet reverse-proxy onto mesh IPs), and automation—built on **Headscale**, consumed with **official Tailscale clients** (no custom app). Funnel and billing are not in Phase 1–2.
 
 Working name pending trademark/domain review. Do not use Tailscale name or logo in product UI; say **“compatible with Tailscale clients.”**
 
@@ -32,7 +32,7 @@ Keep Headscale as the coordination engine; build everything teams miss around it
 | Persona | Needs |
 |---------|--------|
 | Founder / CTO | Zero per-seat cost, afternoon setup, prod locked down |
-| DevOps / platform | Environments, Terraform, K8s, audit, no snowflake ACLs |
+| DevOps / platform | Workspaces, tags, Terraform, K8s, audit, no snowflake ACLs |
 | Developer | SSO, see only allowed devices, request access when needed |
 | Contractor / guest | Temporary access to one machine, nothing else visible |
 | Security / compliance | Who accessed what, when, who approved; exports |
@@ -45,10 +45,10 @@ Keep Headscale as the coordination engine; build everything teams miss around it
 | Cloud | Otterscale | Implementation |
 |-------|------------|----------------|
 | Organisation | **Tenant** | One Headscale instance + control records |
-| VPC | **Environment** (prod, uat, dev) | Tags + rules; optional dedicated instance for strict prod |
-| IAM group | **Group** | Policy groups; map from IdP |
+| VPC | **Workspace** | Headscale ACL group; peers that share a workspace see each other |
+| Resource tags | **Tags** (`prod` / `uat` / `dev` / custom) | Orthogonal ACL tags; not isolation |
+| IAM group | **Workspace membership** | Admin or Member in that workspace |
 | Security group rule | **Access rule** | Compiled ACL/grant lines |
-| Resource tags | **Tags** | Headscale tag owners + scoped auth keys |
 | STS temporary creds | **Access grant** | Time-boxed compiled rule + reaper |
 | Pre-signed URL | **Share link** | Guest user + ephemeral key + narrow rule |
 

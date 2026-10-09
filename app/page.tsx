@@ -5,6 +5,6 @@ export const instant = false;
 
 export default async function HomePage() {
   const session = await auth();
-  if (session?.user) redirect("/workspace");
+  if (session?.user) redirect("/machines");
   redirect("/signin");
 }

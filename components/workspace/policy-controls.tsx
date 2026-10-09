@@ -97,7 +97,7 @@ export function PolicyControls({
         </ul>
       )}
       {preview?.ok && preview.compiled && (
-        <pre className="mt-4 max-h-64 overflow-auto rounded-[40px] border border-ash p-4 text-xs">
+        <pre className="mt-4 max-h-64 overflow-auto rounded-[8px] border border-ash p-4 text-xs">
           {preview.compiled.hujson}
         </pre>
       )}

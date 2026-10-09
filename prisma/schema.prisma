@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -13,9 +13,7 @@ enum PlatformRole {
 }
 
 enum TenantRole {
-  TENANT_ADMIN
-  NET_ADMIN
-  AUDITOR
+  ADMIN
   MEMBER
 }
 
@@ -24,6 +22,17 @@ enum PolicySnapshotStatus {
   APPLIED
   SUPERSEDED
   FAILED
+}
+
+enum AuditCategory {
+  SYSTEM
+  NETWORK
+}
+
+enum PublishedAppStatus {
+  PENDING
+  ACTIVE
+  UNREACHABLE
 }
 
 model User {
@@ -41,15 +50,16 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  accounts            Account[]
-  sessions            Session[]
-  platformMemberships PlatformMembership[]
-  tenantMemberships   TenantMembership[]
-  groupMembers        GroupMember[]
-  policySnapshots     PolicySnapshot[]     @relation("PolicyAuthor")
-  auditEvents         AuditEvent[]         @relation("AuditActor")
-  invitesCreated      UserInvite[]         @relation("InviteCreator")
-  invitesRedeemed     UserInvite[]         @relation("InviteRedeemer")
+  accounts              Account[]
+  sessions              Session[]
+  platformMemberships   PlatformMembership[]
+  tenantMemberships     TenantMembership[]
+  groupMembers          GroupMember[]
+  workspaceMemberships  WorkspaceMembership[]
+  policySnapshots       PolicySnapshot[]      @relation("PolicyAuthor")
+  auditEvents           AuditEvent[]          @relation("AuditActor")
+  invitesCreated        UserInvite[]          @relation("InviteCreator")
+  invitesRedeemed       UserInvite[]          @relation("InviteRedeemer")
 }
 
 model UserInvite {
@@ -58,7 +68,8 @@ model UserInvite {
   email            String
   username         String
   codeHash         String
-  tenantRole       TenantRole @default(MEMBER)
+  tenantRole       TenantRole    @default(MEMBER)
+  platformRole     PlatformRole?
   createdById      String
   expiresAt        DateTime
   redeemedAt       DateTime?
@@ -66,11 +77,22 @@ model UserInvite {
   revokedAt        DateTime?
   createdAt        DateTime   @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User         @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  redeemedBy   User?        @relation("InviteRedeemer", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                 @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  redeemedBy   User?                @relation("InviteRedeemer", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+  workspaces   UserInviteWorkspace[]
 
   @@index([organizationId, email])
+}
+
+model UserInviteWorkspace {
+  inviteId String
+  groupId  String
+
+  invite UserInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  group  Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([inviteId, groupId])
 }
 
 model Account {
@@ -79,12 +101,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -115,26 +137,30 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  settings   OrganizationSettings?
-  environments Environment[]
-  groups     Group[]
-  accessRules AccessRule[]
+  settings        OrganizationSettings?
+  groups          Group[]
+  tags            Tag[]
+  machines        Machine[]
+  accessRules     AccessRule[]
   policySnapshots PolicySnapshot[]
-  auditEvents AuditEvent[]
-  apiKeys     ApiKey[]
-  userInvites UserInvite[]
+  auditEvents     AuditEvent[]
+  apiKeys         ApiKey[]
+  userInvites     UserInvite[]
+  publishedApps   PublishedApp[]
 }
 
 model OrganizationSettings {
-  id                              String   @id @default(cuid())
-  organizationId                  String   @unique
-  setupComplete                   Boolean  @default(false)
-  headscalePublicUrl              String?
-  headscaleInternalUrl            String?
-  relayMapUrl                     String?
-  superAdminsImplicitTenantAdmin  Boolean  @default(true)
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  id                             String   @id @default(cuid())
+  organizationId                 String   @unique
+  setupComplete                  Boolean  @default(false)
+  headscalePublicUrl             String?
+  headscaleInternalUrl           String?
+  relayMapUrl                    String?
+  superAdminsImplicitTenantAdmin Boolean  @default(true)
+  appsBaseDomain                 String   @default("apps.localhost")
+  defaultAuthKeyExpiryHours      Int      @default(24)
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
@@ -152,48 +178,28 @@ model PlatformMembership {
 }
 
 model TenantMembership {
-  id            String     @id @default(cuid())
-  userId        String
-  role          TenantRole
-  environmentId String?
-  createdAt     DateTime   @default(now())
+  id        String     @id @default(cuid())
+  userId    String
+  role      TenantRole
+  createdAt DateTime   @default(now())
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  environment Environment? @relation(fields: [environmentId], references: [id], onDelete: SetNull)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-}
-
-model Environment {
-  id             String   @id @default(cuid())
-  organizationId String
-  slug           String
-  name           String
-  tag            String
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  groups            Group[]
-  accessRules       AccessRule[]
-  tenantMemberships TenantMembership[]
-
-  @@unique([organizationId, slug])
-  @@unique([organizationId, tag])
 }
 
 model Group {
   id             String   @id @default(cuid())
   organizationId String
-  environmentId  String?
   name           String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  environment  Environment?  @relation(fields: [environmentId], references: [id], onDelete: SetNull)
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members      GroupMember[]
+  memberships  WorkspaceMembership[]
+  inviteLinks  UserInviteWorkspace[]
+  machines     MachineWorkspace[]
   accessRules  AccessRule[]
 
   @@unique([organizationId, name])
@@ -212,26 +218,110 @@ model GroupMember {
   @@unique([groupId, email])
 }
 
+model WorkspaceMembership {
+  id        String     @id @default(cuid())
+  userId    String
+  groupId   String
+  role      TenantRole @default(MEMBER)
+  createdAt DateTime   @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  aclTag         String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machines     MachineTag[]
+  accessRules  AccessRule[]
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, aclTag])
+}
+
+model Machine {
+  id              String    @id @default(cuid())
+  organizationId  String
+  headscaleNodeId String    @unique
+  name            String
+  hostname        String    @default("")
+  ipAddresses     String    @default("[]")
+  lastOnline      Boolean   @default(false)
+  lastSeenAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaces   MachineWorkspace[]
+  tags         MachineTag[]
+  apps         PublishedApp[]
+}
+
+model MachineWorkspace {
+  machineId String
+  groupId   String
+
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([machineId, groupId])
+}
+
+model MachineTag {
+  machineId String
+  tagId     String
+
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([machineId, tagId])
+}
+
 model AccessRule {
   id             String   @id @default(cuid())
   organizationId String
-  environmentId  String
   groupId        String
+  tagId          String?
   ports          String   @default("*")
   action         String   @default("accept")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  environment  Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
   group        Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tag          Tag?         @relation(fields: [tagId], references: [id], onDelete: SetNull)
+}
+
+model PublishedApp {
+  id             String             @id @default(cuid())
+  organizationId String
+  machineId      String
+  port           Int
+  subdomain      String
+  status         PublishedAppStatus @default(PENDING)
+  lastError      String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine      Machine      @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, subdomain])
 }
 
 model PolicySnapshot {
   id             String               @id @default(cuid())
   organizationId String
   contentHash    String
-  hujson         String               @db.Text
+  hujson         String
   status         PolicySnapshotStatus @default(PENDING)
   authorId       String?
   appliedAt      DateTime?
@@ -245,19 +335,20 @@ model PolicySnapshot {
 }
 
 model AuditEvent {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
   actorId        String?
   action         String
+  category       AuditCategory @default(SYSTEM)
   resourceType   String?
   resourceId     String?
-  beforeJson     String?  @db.Text
-  afterJson      String?  @db.Text
+  beforeJson     String?
+  afterJson      String?
   ipAddress      String?
   userAgent      String?
   previousHash   String
   eventHash      String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime      @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   actor        User?        @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
@@ -270,7 +361,7 @@ model ApiKey {
   organizationId String
   name           String
   keyHash        String
-  scopes         String[]
+  scopes         String    @default("[]")
   expiresAt      DateTime?
   createdAt      DateTime  @default(now())
   lastUsedAt     DateTime?
