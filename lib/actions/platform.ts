@@ -31,7 +31,8 @@ export async function addSuperAdmin(formData: FormData) {
     resourceId: user.id,
     afterJson: { email },
   });
-  revalidatePath("/platform");
+  revalidatePath("/settings");
+  revalidatePath("/settings/general");
 }
 
 export async function removeSuperAdmin(formData: FormData) {
@@ -53,19 +54,58 @@ export async function removeSuperAdmin(formData: FormData) {
     action: "platform.super_admin_removed",
     resourceId: userId,
   });
-  revalidatePath("/platform");
+  revalidatePath("/settings");
+  revalidatePath("/settings/general");
 }
 
 export async function updateOrgSettings(formData: FormData) {
   const session = await requireSession();
   await requireCapability(session.user.id, "platform.settings");
   const org = await getDefaultOrganization();
-  const relayMapUrl = String(formData.get("relayMapUrl") ?? "").trim() || null;
-  const headscalePublicUrl = String(formData.get("headscalePublicUrl") ?? "").trim() || null;
+  const name = formData.has("name") ? String(formData.get("name") ?? "").trim() : "";
+  const data: {
+    relayMapUrl?: string | null;
+    appsBaseDomain?: string;
+  } = {};
+  if (formData.has("relayMapUrl")) {
+    data.relayMapUrl = String(formData.get("relayMapUrl") ?? "").trim() || null;
+  }
+  if (formData.has("appsBaseDomain")) {
+    const appsBaseDomain = String(formData.get("appsBaseDomain") ?? "").trim();
+    if (appsBaseDomain) data.appsBaseDomain = appsBaseDomain;
+  }
 
+  if (name) {
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: { name },
+    });
+  }
+
+  if (Object.keys(data).length) {
+    await prisma.organizationSettings.update({
+      where: { organizationId: org.id },
+      data,
+    });
+  }
+  revalidatePath("/settings");
+  revalidatePath("/settings/general");
+  revalidatePath("/settings/devices");
+}
+
+export async function updateDeviceSettings(formData: FormData) {
+  const session = await requireSession();
+  await requireCapability(session.user.id, "network.manage");
+  const org = await getDefaultOrganization();
+  const expiryRaw = String(formData.get("defaultAuthKeyExpiryHours") ?? "").trim();
+  const defaultAuthKeyExpiryHours = Number(expiryRaw);
+  if (!Number.isFinite(defaultAuthKeyExpiryHours) || defaultAuthKeyExpiryHours < 1) {
+    throw new Error("Expiry hours must be at least 1");
+  }
   await prisma.organizationSettings.update({
     where: { organizationId: org.id },
-    data: { relayMapUrl, headscalePublicUrl },
+    data: { defaultAuthKeyExpiryHours },
   });
-  revalidatePath("/platform");
+  revalidatePath("/settings/devices");
+  revalidatePath("/machines");
 }

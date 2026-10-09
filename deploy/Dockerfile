@@ -12,7 +12,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm exec prisma generate
 # Satisfies Prisma during Next.js static generation (no DB at image build time).
-ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
+ENV DATABASE_URL=file:./prisma/build.db
 RUN pnpm run build
 
 FROM base AS runner

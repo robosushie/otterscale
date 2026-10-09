@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { loadUserCapabilities } from "@/lib/authz/load-context";
-import { ConsoleHeader } from "@/components/layout/console-header";
+import { ConsoleShell } from "@/components/layout/console-shell";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { CapabilitiesProvider } from "@/contexts/capabilities-context";
 
 export const instant = false;
@@ -19,8 +20,9 @@ export default async function ConsoleLayout({
 
   return (
     <CapabilitiesProvider value={ctx}>
-      <ConsoleHeader ctx={ctx} />
-      <main className="mx-auto w-full max-w-[1432px] flex-1 px-6 py-16">{children}</main>
+      <ConsoleShell ctx={ctx} footer={<SignOutButton />}>
+        {children}
+      </ConsoleShell>
     </CapabilitiesProvider>
   );
 }

@@ -4,7 +4,7 @@ Open-source team mesh control platform on [Headscale](https://github.com/juanfon
 
 ## Console (Next.js + Prisma)
 
-Single-tenant control plane: **PostgreSQL** via `DATABASE_URL`, **Auth.js** (OIDC and/or local username/password + TOTP), policy compiler, audit log, and Headscale API integration.
+Single-tenant control plane: **SQLite** via `DATABASE_URL`, **Auth.js** (local email/username/password + TOTP always on; OIDC when issuer, client id, and client secret are set), policy compiler, audit log, and Headscale API integration. Docker puts **Caddy** in front: `https://console.localhost` (UI) and `https://hs.localhost` (Tailscale login-server).
 
 ### Quick start (local)
 
@@ -14,9 +14,9 @@ Single-tenant control plane: **PostgreSQL** via `DATABASE_URL`, **Auth.js** (OID
    cp .env.example .env
    ```
 
-   Required: `DATABASE_URL`, `AUTH_SECRET` (≥32 chars). Enable **OIDC** and/or **local auth** (`AUTH_LOCAL_AUTH_ENABLED=true` for setup without an IdP).
+   Required: `DATABASE_URL` (`file:./prisma/dev.db`), `AUTH_SECRET` (≥32 chars). Local auth is always on. Set `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, and `AUTH_OIDC_CLIENT_SECRET` to enable SSO buttons.
 
-2. Point `DATABASE_URL` at your Postgres, then apply migrations:
+2. Apply migrations:
 
    ```bash
    pnpm db:migrate
@@ -34,11 +34,15 @@ Single-tenant control plane: **PostgreSQL** via `DATABASE_URL`, **Auth.js** (OID
    pnpm dev
    ```
 
-4. First user: open `/setup` (local auth) or sign in with OIDC — the first account becomes **Owner** and **super admin**, with default environments `prod`, `uat`, `dev`.
+4. First user: open `/setup` — email, then username + password (min 8), then TOTP. OIDC/Google buttons appear on step 1 (disabled until the three OIDC vars are set). The first account becomes **Owner** and **super admin**, with default tags `prod`, `uat`, `dev`. Roles are Owner, Super admin, Admin, and Member. Workspaces isolate peers; tags are labels.
 
-5. Optional Headscale only: `docker compose -f deploy/docker-compose.yml up headscale`.
+5. Join a machine with an official Tailscale client. After **Add device** on `/machines`, run the printed command (`HEADSCALE_PUBLIC_URL`, default `https://hs.localhost`):
 
-### Docker stack (Postgres + Headscale + app)
+   ```bash
+   tailscale up --login-server=https://hs.localhost --auth-key=<key>
+   ```
+
+### Docker stack (Caddy + Headscale + app + SQLite)
 
 Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose.
 
@@ -46,9 +50,31 @@ Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose.
 pnpm deploy:stack
 ```
 
-This script creates or updates `.env` (generates `AUTH_SECRET`, sets bundled `DATABASE_URL` when empty), builds images, starts Postgres and Headscale, creates a Headscale API key when `HEADSCALE_API_KEY` is missing, and starts the app. The app container runs **`prisma migrate deploy`** against `DATABASE_URL` before `node server.js`.
+This script creates or updates `.env` (generates `AUTH_SECRET`, sets SQLite `DATABASE_URL=file:/data/otterscale.db`), builds images, starts Headscale and Caddy, and writes `HEADSCALE_API_KEY` only after Headscale accepts the key. The app container runs **`prisma migrate deploy`** before `node server.js`.
 
-Use your own Postgres by setting `DATABASE_URL` in `.env` before `pnpm deploy:stack` and run Compose without the stack overlay: `docker compose -f deploy/docker-compose.yml up --build`.
+**Network Apps** publish a mesh address on `https://{subdomain}.apps.localhost` (override with `APPS_BASE_DOMAIN`). One `proxy` container (Go `tsnet`) does that work: it joins Headscale as hostname `edge` / `tag:edge`, reverse-proxies on port 80, and answers TCP probes on port 4180. The public `caddy` service terminates TLS and forwards `*.apps.localhost` to `proxy:80`. `headscale/headscale` stays the coordination server. `pnpm deploy:stack` writes `APPS_EDGE_AUTHKEY`, a reusable `tag:edge` pre-auth key, so the proxy can join. Chrome resolves `*.apps.localhost`. The Windows Tailscale client cannot resolve `*.localhost`, so it joins Headscale at `http://127.0.0.1:8080` (published on loopback only). This is a reverse proxy onto the mesh, not Funnel.
+
+If `*.localhost` does not resolve, add hosts:
+
+```text
+127.0.0.1 console.localhost hs.localhost
+```
+
+Official Tailscale clients require a trusted TLS certificate. After Caddy has started once, export and trust the local CA:
+
+```bash
+docker exec caddy cat /data/caddy/pki/authorities/local/root.crt
+```
+
+On Windows (elevated): save that file as `caddy-root.crt`, then `certutil -addstore -f ROOT caddy-root.crt`.
+
+To rotate the Headscale API key by hand:
+
+```bash
+docker exec headscale /ko-app/headscale apikeys create --expiration 8760h
+```
+
+Put the printed key in `.env` as `HEADSCALE_API_KEY`, then recreate the app container.
 
 ### Scripts
 
@@ -57,10 +83,9 @@ Use your own Postgres by setting `DATABASE_URL` in `.env` before `pnpm deploy:st
 | `pnpm dev` | Next.js dev server |
 | `pnpm db:make -- <name>` | New migration from schema (local dev; autogenerate only) |
 | `pnpm db:migrate` | Apply pending migrations (deploy / fresh DB) |
-| `pnpm deploy:stack` | Build & run bundled Docker stack (Headscale bootstrap + auto-migrate) |
-| `docker compose -f deploy/docker-compose.yml up` | Headscale + app only (set `DATABASE_URL` in `.env`) |
-| `pnpm test` | Vitest (policy compiler, authz) |
+| `pnpm deploy:stack` | Build & run Docker stack (Caddy + Headscale + SQLite app) |
+| `pnpm test` | Vitest |
 
 ### Repo layout
 
-`app/` routes · `components/` UI · `lib/` server (auth, policy, headscale adapter, prisma) · `prisma/` schema · `deploy/` Compose · see [docs/architecture.md](./docs/architecture.md).
+`app/` routes · `components/` UI · `lib/` server (auth, policy, headscale adapter, prisma) · `prisma/` schema · `deploy/` Compose / Caddy · see [docs/architecture.md](./docs/architecture.md).

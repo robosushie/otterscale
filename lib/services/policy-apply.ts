@@ -5,33 +5,58 @@ import { putPolicy, isHeadscaleConfigured } from "@/lib/headscale/client";
 import { appendAuditEvent } from "@/lib/audit/write";
 import { PolicySnapshotStatus } from "@prisma/client";
 import { getDefaultOrganization } from "@/lib/org/singleton";
+import { workspaceTagName } from "@/lib/console/user-role";
+import { parseIpAddresses, preferMeshIp } from "@/lib/machines/sync";
+
+const EDGE_TAG = "tag:edge";
 
 export async function loadCompileInput(organizationId: string): Promise<CompileInput> {
-  const [groups, environments, rules, settings] = await Promise.all([
+  const [groups, tags, rules, apps, platformAdmins] = await Promise.all([
     prisma.group.findMany({
       where: { organizationId },
-      include: { members: true },
+      include: {
+        members: true,
+        memberships: { include: { user: { select: { email: true } } } },
+      },
     }),
-    prisma.environment.findMany({ where: { organizationId }, orderBy: { sortOrder: "asc" } }),
-    prisma.accessRule.findMany({ where: { organizationId }, include: { group: true, environment: true } }),
-    prisma.organizationSettings.findUnique({ where: { organizationId } }),
+    prisma.tag.findMany({ where: { organizationId } }),
+    prisma.accessRule.findMany({ where: { organizationId }, include: { group: true, tag: true } }),
+    prisma.publishedApp.findMany({
+      where: { organizationId },
+      include: { machine: true },
+    }),
+    prisma.platformMembership.findMany({ include: { user: { select: { email: true } } } }),
   ]);
 
   const adminGroup = groups.find((g) => g.name === "platform-admins");
-  const tagOwnersEmails = adminGroup?.members.map((m) => m.email) ?? [];
+  const platformEmails = platformAdmins.map((m) => m.user.email);
+  const tagOwnersEmails = [...new Set([...(adminGroup?.members.map((m) => m.email) ?? []), ...platformEmails])];
 
   return {
-    groups: groups.map((g) => ({
-      name: g.name,
-      memberEmails: g.members.map((m) => m.email),
-    })),
-    environments: environments.map((e) => ({ tag: e.tag, slug: e.slug })),
-    rules: rules.map((r) => ({
-      groupName: r.group.name,
-      environmentTag: r.environment.tag,
-      ports: r.ports,
-    })),
+    workspaces: groups.map((g) => {
+      const fromMemberships = g.memberships.map((m) => m.user.email);
+      const fromMembers = g.members.map((m) => m.email);
+      return {
+        name: g.name,
+        memberEmails: [...new Set([...fromMemberships, ...fromMembers, ...platformEmails])],
+        workspaceTag: workspaceTagName(g.name),
+      };
+    }),
+    tags: tags.map((t) => ({ aclTag: t.aclTag })),
+    extraRules: rules
+      .filter((r) => r.tag)
+      .map((r) => ({
+        srcGroup: r.group.name,
+        destTag: r.tag!.aclTag,
+        ports: r.ports,
+      })),
     tagOwnersEmails,
+    edgeTag: EDGE_TAG,
+    appDestinations: apps.flatMap((app) => {
+      const ip = preferMeshIp(parseIpAddresses(app.machine.ipAddresses));
+      if (!ip) return [];
+      return [{ dest: `${ip}:${app.port}` }];
+    }),
   };
 }
 
@@ -115,4 +140,11 @@ export async function rollbackPolicy(actorId: string) {
     await putPolicy(previous.hujson);
   }
   await applyPolicy(previous.id, actorId);
+}
+
+export async function compileAndApply(actorId: string) {
+  const preview = await previewPolicy(actorId);
+  if (!preview.ok) return preview;
+  await applyPolicy(preview.snapshot.id, actorId);
+  return preview;
 }

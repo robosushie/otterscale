@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local Go binaries
+/proxy
+/cmd/proxy/proxy
+/cmd/proxy/proxy.exe
+
+# sqlite (local / docker volume copies)
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/*.db-wal
+/prisma/*.db-shm

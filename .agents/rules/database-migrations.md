@@ -5,7 +5,7 @@ globs: "prisma/**/*"
 
 # Database migrations (Prisma)
 
-All schema changes go through **Prisma Migrate**. PostgreSQL connection uses `DATABASE_URL`.
+All schema changes go through **Prisma Migrate**. SQLite connection uses `DATABASE_URL` (`file:…`).
 
 ## Rules
 

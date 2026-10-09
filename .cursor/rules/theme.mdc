@@ -14,13 +14,14 @@ Full spec: [`docs/theme.md`](../../docs/theme.md). Implement tokens in `app/glob
 - Primary filled CTA: `#2b59d1` + parchment/white uppercase mono — one per screen.
 - Secondary filled: `#242424`. Ghost: 1px Off-Black border, transparent.
 - Headlines: Instrument Serif weight **400** only. Body/UI: IBM Plex Mono.
-- Buttons/tags: 100px / 9999px pills. Cards: 40px radius, 40px padding.
+- Buttons/inputs: 6px radius. Cards: 8px radius, 20px padding.
+- Console: left sidebar, single column, no bento grids.
 - No card `box-shadow`. Pastels (sky, mint, coral, gold) are decorative washes only.
 - Do not use `prefers-color-scheme: dark` for product UI unless explicitly requested.
 
 ## Layout
 
-- Content max-width 1432px; section gaps 64px; nav ~80px.
+- Content max-width 1432px; sidebar 240px.
 
 ## Tailwind usage
 
@@ -31,7 +32,7 @@ Prefer token-backed utilities (`bg-parchment`, `text-off-black`, `bg-lake-blue`,
 ```tsx
 <button
   type="button"
-  className="inline-flex h-12 items-center gap-2 rounded-[100px] bg-lake-blue px-8 text-[14px] font-medium uppercase tracking-[-0.025em] text-parchment"
+  className="inline-flex h-9 items-center gap-2 rounded-[6px] bg-lake-blue px-4 text-[14px] font-medium uppercase tracking-[-0.025em] text-parchment"
 >
   Get started ▸
 </button>

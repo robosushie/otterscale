@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * One-command stack deploy: Postgres (bundled) + Headscale + Otterscale app.
- * - Ensures .env (AUTH_SECRET, DATABASE_URL for bundled Postgres)
+ * One-command stack deploy: Caddy + Headscale + Otterscale app (SQLite).
+ * - Ensures .env (AUTH_SECRET, SQLite DATABASE_URL, public Headscale URL)
  * - Builds images and starts Compose
  * - Bootstraps Headscale user + API key into .env when HEADSCALE_API_KEY is empty
  * - App container runs `prisma migrate deploy` on start (see deploy/docker-entrypoint.sh)
@@ -24,15 +24,12 @@ function composeArgs() {
     "otterscale",
     "-f",
     path.join(repoRoot, "deploy/docker-compose.yml"),
-    "-f",
-    path.join(repoRoot, "deploy/docker-compose.stack.yml"),
     "--env-file",
     envPath,
   ];
 }
 
-const STACK_DATABASE_URL =
-  "postgresql://otterscale:otterscale@postgres:5432/otterscale";
+const STACK_DATABASE_URL = "file:/data/otterscale.db";
 const HEADSCALE_DEFAULT_USER = "tagged-devices";
 
 function run(cmd, args, opts = {}) {
@@ -40,13 +37,16 @@ function run(cmd, args, opts = {}) {
     cwd: repoRoot,
     stdio: opts.quiet ? "pipe" : "inherit",
     encoding: "utf8",
-    shell: process.platform === "win32",
+    // Windows needs a shell for `docker compose`; probes pass argv arrays with
+    // colons/spaces and must use shell:false so cmd.exe does not rewrite them.
+    shell: opts.shell ?? process.platform === "win32",
     env: { ...process.env, ...opts.env },
+    windowsHide: true,
   });
   if (res.status !== 0) {
     const detail = res.stderr?.trim() || res.stdout?.trim();
     throw new Error(
-      `${cmd} ${args.join(" ")} failed (exit ${res.status})${detail ? `: ${detail}` : ""}`,
+      `${cmd} ${args[0] ?? ""} failed (exit ${res.status})${detail ? `: ${detail.slice(0, 400)}` : ""}`,
     );
   }
   return res.stdout ?? "";
@@ -129,25 +129,25 @@ function ensureEnvDefaults(content) {
   }
 
   const db = map.get("DATABASE_URL")?.trim() ?? "";
-  const looksLikeHostPostgres =
-    db &&
-    /@(localhost|127\.0\.0\.1)(:\d+)?\//.test(db) &&
-    !db.includes("@postgres:");
-  if (!db || looksLikeHostPostgres) {
+  const looksLikePostgres = /^postgres(ql)?:\/\//i.test(db);
+  const looksLikeHostSqlite = db.startsWith("file:./") || db.startsWith("file:prisma/");
+  if (!db || looksLikePostgres || looksLikeHostSqlite) {
     updates.set("DATABASE_URL", STACK_DATABASE_URL);
-    console.log(
-      looksLikeHostPostgres
-        ? "Pointed DATABASE_URL at bundled Postgres (host localhost URLs do not work inside the app container)"
-        : "Set DATABASE_URL to bundled Postgres (deploy/docker-compose.stack.yml)",
-    );
+    console.log("Set DATABASE_URL to SQLite file:/data/otterscale.db (app volume)");
   }
 
-  if (!map.get("AUTH_URL")?.trim()) {
-    updates.set("AUTH_URL", "http://localhost:3000");
+  const authUrl = map.get("AUTH_URL")?.trim() ?? "";
+  if (!authUrl || /localhost:3000|127\.0\.0\.1:3000/.test(authUrl)) {
+    updates.set("AUTH_URL", "https://console.localhost");
   }
 
-  if (!map.get("HEADSCALE_INTERNAL_URL")?.trim()) {
-    updates.set("HEADSCALE_INTERNAL_URL", "http://localhost:8080");
+  if (!map.get("HEADSCALE_PUBLIC_URL")?.trim()) {
+    updates.set("HEADSCALE_PUBLIC_URL", "https://hs.localhost");
+  }
+
+  const internal = map.get("HEADSCALE_INTERNAL_URL")?.trim() ?? "";
+  if (!internal || /localhost|127\.0\.0\.1/.test(internal)) {
+    updates.set("HEADSCALE_INTERNAL_URL", "http://headscale:8080");
   }
 
   if (updates.size === 0) return content;
@@ -206,6 +206,181 @@ function ensureHeadscaleUser() {
   headscaleExec(["users", "create", HEADSCALE_DEFAULT_USER]);
 }
 
+/**
+ * Same call the console uses (GET /api/v1/node), from the Docker network.
+ * Headscale 0.23 rejects an unknown key with HTTP 500 + "Unauthorized".
+ * The Bearer token is passed in env so Windows cmd.exe cannot split the header.
+ */
+function probeHeadscaleApiKey(apiKey) {
+  const script =
+    'fetch("http://headscale:8080/api/v1/node",{headers:{Authorization:"Bearer "+process.env.PROBE_KEY}}).then(async(r)=>{const t=await r.text();process.stdout.write(JSON.stringify({ok:r.ok,status:r.status,body:t.slice(0,200)}));}).catch((e)=>{process.stdout.write(JSON.stringify({ok:false,status:0,body:String(e.message||e)}));})';
+  const res = spawnSync(
+    "docker",
+    [
+      "compose",
+      ...composeArgs(),
+      "run",
+      "--rm",
+      "--no-deps",
+      "-T",
+      "-e",
+      `PROBE_KEY=${apiKey}`,
+      "--entrypoint",
+      "node",
+      "app",
+      "-e",
+      script,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      shell: false,
+      windowsHide: true,
+      env: process.env,
+    },
+  );
+  const raw = `${res.stdout ?? ""}\n${res.stderr ?? ""}`.trim();
+  const parsed = parseProbePayload(raw);
+  if (!parsed) {
+    const detail =
+      raw.slice(0, 200) || `probe exit ${res.status} (${res.error?.message ?? "no output"})`;
+    throw new Error(`Headscale API key probe failed: ${detail}`);
+  }
+  return {
+    ok: Boolean(parsed.ok),
+    status: Number(parsed.status) || 0,
+    body: String(parsed.body ?? ""),
+  };
+}
+
+function describeProbe(probe) {
+  const detail = probe.body?.trim().replace(/\s+/g, " ").slice(0, 120);
+  return detail ? `${probe.status}: ${detail}` : String(probe.status);
+}
+
+/** Docker Compose may wrap the one-line JSON probe with logs. */
+function parseProbePayload(text) {
+  const start = text.indexOf('{"ok":');
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(start, i + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function removeLegacyHop() {
+  console.log("Removing leftover edge/probe containers if present...");
+  spawnSync("docker", ["rm", "-f", "proxy", "edge", "probe", "apps-edge", "apps-probe", "apps-caddy"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: "pipe",
+    shell: process.platform === "win32",
+    windowsHide: true,
+  });
+  spawnSync("docker", ["volume", "rm", "otterscale_apps_edge_state"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: "pipe",
+    shell: process.platform === "win32",
+    windowsHide: true,
+  });
+}
+
+function parsePreAuthKeyList(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    return parsed.preAuthKeys ?? parsed.preauthkeys ?? parsed.keys ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function edgeAuthKeyIsValid(key) {
+  if (!key) return false;
+  let raw = "";
+  try {
+    raw = headscaleExec([
+      "preauthkeys",
+      "list",
+      "--user",
+      HEADSCALE_DEFAULT_USER,
+      "--output",
+      "json",
+    ]);
+  } catch {
+    return true;
+  }
+  const rows = parsePreAuthKeyList(raw);
+  if (!Array.isArray(rows) || rows.length === 0) return false;
+  const now = Date.now();
+  return rows.some((row) => {
+    const stored = String(row.key ?? row.Key ?? "").trim();
+    if (!stored) return false;
+    const same = stored === key || key.startsWith(stored) || stored.startsWith(key);
+    if (!same) return false;
+    if (row.expired === true) return false;
+    const exp = row.expiration ?? row.Expiration;
+    if (exp) {
+      const t = Date.parse(exp);
+      if (!Number.isNaN(t) && t < now) return false;
+    }
+    return true;
+  });
+}
+
+function createEdgeAuthKey() {
+  console.log("Creating reusable Headscale pre-auth key for tag:edge...");
+  const raw = headscaleExec([
+    "preauthkeys",
+    "create",
+    "--user",
+    HEADSCALE_DEFAULT_USER,
+    "--reusable",
+    "--expiration",
+    "8760h",
+    "--tags",
+    "tag:edge",
+    "--output",
+    "json",
+  ]);
+  let key = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    const row = parsed.preAuthKey ?? parsed.preauthkey ?? parsed;
+    key = typeof row === "string" ? row : (row.key ?? parsed.key ?? "");
+  } catch {
+    const match = raw.match(/\b[\w-]{20,}\b/);
+    if (match) key = match[0];
+  }
+  key = String(key).trim().replace(/^"|"$/g, "");
+  if (key.length < 16) {
+    throw new Error("Headscale did not return an edge pre-auth key");
+  }
+  return key;
+}
+
 function createHeadscaleApiKey() {
   console.log("Creating Headscale API key...");
   const raw = headscaleExec([
@@ -255,12 +430,12 @@ async function main() {
     run("docker", ["compose", ...composeArgs(), "build"], { env: composeEnv });
   }
 
-  console.log("Starting Postgres and Headscale...");
-  run(
-    "docker",
-    ["compose", ...composeArgs(), "up", "-d", "postgres", "headscale"],
-    { env: composeEnv },
-  );
+  removeLegacyHop();
+
+  console.log("Starting Headscale and Caddy...");
+  run("docker", ["compose", ...composeArgs(), "up", "-d", "--remove-orphans", "headscale", "caddy"], {
+    env: composeEnv,
+  });
 
   console.log("Waiting for Headscale...");
   await waitForHeadscale();
@@ -269,25 +444,67 @@ async function main() {
 
   envContent = fs.readFileSync(envPath, "utf8");
   let apiKey = getEnvValue(envContent, "HEADSCALE_API_KEY");
-  if (!apiKey) {
+  const existing = apiKey ? probeHeadscaleApiKey(apiKey) : null;
+  if (existing?.ok) {
+    console.log("HEADSCALE_API_KEY is accepted by Headscale");
+  } else {
+    if (existing) {
+      console.log(`HEADSCALE_API_KEY rejected (${describeProbe(existing)}); creating a new key`);
+    } else {
+      console.log("HEADSCALE_API_KEY is empty; creating a new key");
+    }
     apiKey = createHeadscaleApiKey();
+    const created = probeHeadscaleApiKey(apiKey);
+    if (!created.ok) {
+      throw new Error(
+        `Newly created HEADSCALE_API_KEY was rejected by Headscale (${describeProbe(created)})`,
+      );
+    }
     envContent = setEnvValue(envContent, "HEADSCALE_API_KEY", apiKey);
     fs.writeFileSync(envPath, envContent, "utf8");
     console.log("Wrote HEADSCALE_API_KEY to .env");
-  } else {
-    console.log("HEADSCALE_API_KEY already set; skipping API key creation");
   }
 
-  console.log("Starting Otterscale app (migrations run on container start)...");
-  run("docker", ["compose", ...composeArgs(), "up", "-d", "app", "--force-recreate"], {
-    env: { ...composeEnv, HEADSCALE_API_KEY: apiKey },
-  });
+  envContent = fs.readFileSync(envPath, "utf8");
+  let edgeKey = getEnvValue(envContent, "APPS_EDGE_AUTHKEY");
+  if (!edgeKey || !edgeAuthKeyIsValid(edgeKey)) {
+    if (edgeKey) {
+      console.log("APPS_EDGE_AUTHKEY is missing or expired in Headscale; creating a new key");
+    }
+    edgeKey = createEdgeAuthKey();
+    envContent = setEnvValue(envContent, "APPS_EDGE_AUTHKEY", edgeKey);
+    fs.writeFileSync(envPath, envContent, "utf8");
+    console.log("Wrote APPS_EDGE_AUTHKEY to .env");
+  }
+
+  console.log("Starting Otterscale app, public Caddy, and apps proxy (migrations run on container start)...");
+  run(
+    "docker",
+    [
+      "compose",
+      ...composeArgs(),
+      "up",
+      "-d",
+      "--remove-orphans",
+      "app",
+      "caddy",
+      "proxy",
+      "--force-recreate",
+    ],
+    {
+      env: { ...composeEnv, HEADSCALE_API_KEY: apiKey, APPS_EDGE_AUTHKEY: edgeKey },
+    },
+  );
 
   console.log("\nStack is up:");
-  console.log("  App:       http://localhost:3000  (first visit: /setup or sign-in)");
-  console.log("  Headscale: http://localhost:8080");
-  console.log("  Postgres:  localhost:5432 (bundled; not published by default — use docker exec if needed)");
-  console.log("\nTailscale clients: tailscale up --login-server=http://<host>:8080 --auth-key=<from Network UI>");
+  console.log("  Console:   https://console.localhost  (first visit: /setup or sign-in)");
+  console.log("  Headscale: https://hs.localhost");
+  console.log("  Apps:      https://{subdomain}.apps.localhost");
+  console.log("  SQLite:    /data/otterscale.db in the app volume");
+  console.log("\nAdd to hosts if needed:  127.0.0.1 console.localhost hs.localhost");
+  console.log("Trust Caddy's local CA (Tailscale requires it):");
+  console.log("  docker exec caddy cat /data/caddy/pki/authorities/local/root.crt");
+  console.log("\nTailscale clients on this PC: tailscale up --login-server=http://127.0.0.1:8080 --auth-key=<from Machines UI>");
 }
 
 main().catch((err) => {

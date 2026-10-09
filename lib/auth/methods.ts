@@ -1,24 +1,44 @@
-function envBool(value: string | undefined, defaultValue: boolean): boolean {
-  if (value === undefined || value === "") return defaultValue;
-  return value === "true" || value === "1";
+function emptyToUndef(value: string | undefined): string | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  return value;
 }
 
-/** Safe auth method flags for UI (no secrets). */
+export function hasOidcCredentials(): boolean {
+  return Boolean(
+    emptyToUndef(process.env.AUTH_OIDC_ISSUER) &&
+      emptyToUndef(process.env.AUTH_OIDC_CLIENT_ID) &&
+      emptyToUndef(process.env.AUTH_OIDC_CLIENT_SECRET),
+  );
+}
+
+export function isGoogleOidcIssuer(issuer = process.env.AUTH_OIDC_ISSUER): boolean {
+  if (!issuer) return false;
+  try {
+    const host = new URL(issuer).hostname;
+    return host === "accounts.google.com" || host.endsWith(".google.com");
+  } catch {
+    return issuer.includes("accounts.google.com");
+  }
+}
+
+/** Safe auth method flags for UI (no secrets). Local auth is always on. */
 export function getAuthMethodsPublic() {
+  const oidcEnabled = hasOidcCredentials();
   return {
-    oidcEnabled: envBool(process.env.AUTH_OIDC_ENABLED, true),
-    localAuthEnabled: envBool(process.env.AUTH_LOCAL_AUTH_ENABLED, true),
+    oidcEnabled,
+    googleOidcEnabled: oidcEnabled && isGoogleOidcIssuer(),
+    localAuthEnabled: true,
   };
 }
 
 export function isOidcEnabled(): boolean {
-  return envBool(process.env.AUTH_OIDC_ENABLED, true);
+  return hasOidcCredentials();
 }
 
 export function isLocalAuthEnabled(): boolean {
-  return envBool(process.env.AUTH_LOCAL_AUTH_ENABLED, true);
+  return true;
 }
 
-export function useJwtSessions(): boolean {
-  return isLocalAuthEnabled();
+export function jwtSessionsEnabled(): boolean {
+  return true;
 }

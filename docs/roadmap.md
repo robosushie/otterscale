@@ -47,7 +47,7 @@ Indicative staffing: one to three full-time engineers; dates are estimates, not 
 
 ### Policy compiler (core differentiator seed)
 
-- [ ] Intent model: groups, environment tags (`tag:prod`, `tag:uat`, `tag:dev`), access rules
+- [x] Intent model: workspaces (ACL groups), tags (`tag:prod`, custom), extra access rules
 - [ ] Deterministic HuJSON compile; versioned snapshots with author, time, hash
 - [ ] Generated `tests` block; **apply blocked** if policy check fails
 - [ ] Diff preview in plain language (who gains/loses access)
@@ -56,9 +56,10 @@ Indicative staffing: one to three full-time engineers; dates are estimates, not 
 
 ### Network console (tenant scope)
 
-- [ ] Device inventory from Headscale API; filter list by same rules as policy (UI must match net intent)
-- [ ] Auth keys: scoped by environment tag, reusable/ephemeral, expiry
-- [ ] Environments UI: default soft envs via tags; document strict env = separate instance (Phase 2)
+- [x] Device inventory from Headscale API; filter list by workspace membership (Owner/SA see all)
+- [x] Auth keys: workspace + tag multi-select, reusable/ephemeral, expiry
+- [x] Tags UI (prod/uat/dev/custom); workspaces isolate peers; strict isolation = separate instance later
+- [x] Network Apps: Go tsnet `proxy` reverse-proxies `{subdomain}.{APPS_BASE_DOMAIN}` onto node IP:port (not Funnel)
 
 ### Audit
 
@@ -86,7 +87,7 @@ Indicative staffing: one to three full-time engineers; dates are estimates, not 
 - [ ] **Exactly one Owner** (DB constraint); first-run setup mode with one-time host token, no default password, MFA + recovery codes
 - [ ] Owner invites/removes super admins; ownership transfer (two-step + MFA)
 - [ ] Super admins: create/suspend/resume/delete tenants; assign tenant admins; fleet health; capacity; upgrades (canary, stepwise Headscale minors)
-- [ ] Tenant roles: tenant admin, net admin (env-scoped), auditor, member; optional guest via Phase 3 links
+- [x] Tenant roles for this phase: Admin (workspace) and Member; Owner / Super admin are platform-wide (no NET_ADMIN / AUDITOR)
 - [ ] Navigation from API **capability grants**—Platform area requires step-up MFA + banner
 - [ ] Tenant switcher (prod / uat / dev spaces or customer tenants) with role badges
 - [ ] Install setting: implicit tenant-admin for super admins (on for single-org, off for hosted default)

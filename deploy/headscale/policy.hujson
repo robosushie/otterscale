@@ -1,7 +1,11 @@
 {
   // Minimal open policy for local / first boot. Replace via Otterscale policy apply.
+  // tag:edge must exist here so the proxy container (tsnet hostname edge) can join.
   "groups": {
     "group:default": []
+  },
+  "tagOwners": {
+    "tag:edge": ["tagged-devices"]
   },
   "acls": [
     {

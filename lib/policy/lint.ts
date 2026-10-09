@@ -5,26 +5,20 @@ export type LintIssue = { level: "warn" | "error"; message: string };
 export function lintPolicyInput(input: CompileInput): LintIssue[] {
   const issues: LintIssue[] = [];
 
-  for (const g of input.groups) {
-    if (g.memberEmails.length === 0) {
+  for (const ws of input.workspaces) {
+    if (ws.memberEmails.length === 0) {
       issues.push({
         level: "warn",
-        message: `Group "${g.name}" has no members.`,
+        message: `Workspace "${ws.name}" has no human members.`,
       });
     }
   }
 
-  for (const rule of input.rules) {
-    if (rule.ports === "*") {
-      issues.push({
-        level: "warn",
-        message: `Rule for group "${rule.groupName}" allows all ports on ${rule.environmentTag}.`,
-      });
-    }
-    if (!input.groups.some((g) => g.name === rule.groupName)) {
+  for (const rule of input.extraRules) {
+    if (!input.workspaces.some((w) => w.name === rule.srcGroup)) {
       issues.push({
         level: "error",
-        message: `Rule references unknown group "${rule.groupName}".`,
+        message: `Rule references unknown workspace "${rule.srcGroup}".`,
       });
     }
   }

@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { AuditCategory } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export type AuditPayload = {
@@ -11,6 +12,7 @@ export type AuditPayload = {
   afterJson?: unknown;
   ipAddress?: string;
   userAgent?: string;
+  category?: AuditCategory;
 };
 
 function hashEvent(previousHash: string, payload: string): string {
@@ -42,6 +44,7 @@ export async function appendAuditEvent(input: AuditPayload): Promise<void> {
       organizationId: input.organizationId,
       actorId: input.actorId,
       action: input.action,
+      category: input.category ?? AuditCategory.SYSTEM,
       resourceType: input.resourceType,
       resourceId: input.resourceId,
       beforeJson: input.beforeJson ? JSON.stringify(input.beforeJson) : null,
