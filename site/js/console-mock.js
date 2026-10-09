@@ -2,7 +2,7 @@
   const html = `
     <div class="console-frame" data-console>
       <aside class="console-side" aria-label="Console">
-        <div class="console-mark">Otterscale</div>
+        <div class="console-mark"><img src="./logo.svg" width="28" height="28" alt="" />Otterscale</div>
         <div class="console-group">Network</div>
         <button type="button" class="nested is-on" data-panel="machines">Machines</button>
         <button type="button" class="nested" data-panel="apps">Apps</button>
