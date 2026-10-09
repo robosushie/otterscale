@@ -32,6 +32,7 @@ body {
   line-height: 1.35;
   letter-spacing: -0.4px;
   font-weight: 400;
+  overflow-x: hidden;
 }
 
 h1,
@@ -66,17 +67,53 @@ a {
 }
 
 .wrap {
-  width: min(1432px, calc(100% - 48px));
+  width: min(1120px, calc(100% - 160px));
   margin: 0 auto;
+}
+
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--color-parchment);
+  border-bottom: 1px solid var(--color-ash);
 }
 
 .nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
-  padding: 24px 0;
-  border-bottom: 1px solid var(--color-ash);
+  min-height: 56px;
+  padding: 12px 0;
+}
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-off-black);
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--color-off-black);
+  cursor: pointer;
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-style: normal;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: normal;
+  display: inline-block;
+  vertical-align: middle;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
 .brand {
@@ -104,14 +141,25 @@ a {
 
 .hero {
   position: relative;
-  overflow: hidden;
-  padding: 80px 0 72px;
+  overflow: visible;
+  padding: 88px 0 80px;
+}
+
+.hero-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 40px;
+  align-items: center;
 }
 
 .wash {
   position: absolute;
-  inset: -20% -10% auto;
-  height: 420px;
+  top: 28px;
+  bottom: 28px;
+  left: 50%;
+  width: 100vw;
+  margin-left: -50vw;
+  height: auto;
   background: linear-gradient(
     120deg,
     var(--color-periwinkle-mist),
@@ -119,11 +167,19 @@ a {
     var(--color-mint),
     var(--color-gold)
   );
-  opacity: 0.45;
-  filter: blur(40px);
+  opacity: 0.5;
+  filter: blur(28px);
   animation: drift 18s ease-in-out infinite alternate;
   pointer-events: none;
   transform: translate3d(var(--wx, 0%), var(--wy, 0%), 0);
+  z-index: 0;
+}
+
+.hero-copy,
+.hero-split,
+.hero > [data-reveal] {
+  position: relative;
+  z-index: 1;
 }
 
 .hero.is-follow .wash {
@@ -256,9 +312,74 @@ details.platform + details.platform {
 details.platform summary {
   cursor: pointer;
   list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 20px 0;
   font-family: var(--font-display);
   font-size: 24px;
+}
+
+.steps {
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+}
+
+.steps li {
+  margin-top: 12px;
+  color: var(--color-graphite);
+  font-size: 14px;
+}
+
+.arch {
+  position: relative;
+}
+
+.arch svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.arch-caption {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--color-graphite);
+  min-height: 2.7em;
+}
+
+.arch-node {
+  cursor: pointer;
+}
+
+.arch-node rect {
+  fill: var(--color-paper);
+  stroke: var(--color-ash);
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+.arch-node.is-on rect,
+.arch-node:hover rect,
+.arch-node:focus-visible rect {
+  fill: var(--color-periwinkle-mist);
+  stroke: var(--color-off-black);
+}
+
+.arch-node text {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  fill: var(--color-off-black);
+}
+
+.arch-edge {
+  stroke: var(--color-ash);
+  stroke-width: 1.5;
+  fill: none;
+  transition: stroke 0.2s ease;
+}
+
+.arch-edge.is-on {
+  stroke: var(--color-off-black);
 }
 
 details.platform summary::-webkit-details-marker {
@@ -385,14 +506,44 @@ pre {
   color: var(--color-graphite);
 }
 
+@media (max-width: 1100px) {
+  .wrap {
+    width: calc(100% - 48px);
+  }
+
+  .hero-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
-  .nav {
+  .wrap {
+    width: calc(100% - 32px);
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .nav-links {
+    display: none;
     flex-direction: column;
     align-items: flex-start;
+    width: 100%;
+    padding-bottom: 12px;
+  }
+
+  .nav.is-open .nav-links {
+    display: flex;
   }
 
   .hero {
-    padding: 48px 0;
+    padding: 56px 0 48px;
+  }
+
+  .wash {
+    top: 16px;
+    bottom: 16px;
   }
 
   .stats {

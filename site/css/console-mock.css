@@ -1,0 +1,133 @@
+.console-frame {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 420px;
+  max-height: 480px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-ash);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.console-side {
+  border-right: 1px solid var(--color-ash);
+  background: var(--color-parchment);
+  padding: 12px 8px 16px;
+  overflow-y: auto;
+}
+
+.console-mark {
+  font-family: var(--font-display);
+  font-size: 18px;
+  padding: 8px 10px 12px;
+}
+
+.console-group {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--color-smoke);
+  letter-spacing: -0.4px;
+  padding: 10px 10px 4px;
+}
+
+.console-side button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--color-off-black);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.console-side button.nested {
+  padding-left: 22px;
+}
+
+.console-side button.is-on,
+.console-side button:hover {
+  background: color-mix(in srgb, var(--color-ash) 55%, transparent);
+}
+
+.console-main {
+  padding: 20px;
+  overflow: auto;
+}
+
+.console-main h3 {
+  font-size: 24px;
+}
+
+.console-main .blurb {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.console-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+.console-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--color-smoke);
+  text-transform: uppercase;
+  letter-spacing: -0.4px;
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--color-ash);
+}
+
+.console-table td {
+  padding: 10px 8px 10px 0;
+  border-bottom: 1px solid var(--color-ash);
+  color: var(--color-off-black);
+}
+
+.tag {
+  display: inline-block;
+  border: 1px solid var(--color-ash);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.console-pre {
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+.console-panel[hidden] {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .console-frame {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .console-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-ash);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .console-group {
+    width: 100%;
+    padding: 8px 4px 0;
+  }
+
+  .console-side button {
+    width: auto;
+  }
+}
