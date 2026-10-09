@@ -7,12 +7,29 @@ console.localhost {
 	reverse_proxy app:3000
 }
 
+http://hs.localhost {
+	handle /generate_204 {
+		respond 204
+	}
+	handle * {
+		redir https://{host}{uri}
+	}
+}
+
 hs.localhost {
 	tls internal
-	reverse_proxy headscale:8080
+	reverse_proxy headscale:8080 {
+		header_up True-Client-IP {remote_host}
+		header_up X-Real-IP {remote_host}
+		flush_interval -1
+		transport http {
+			read_timeout 1h
+			write_timeout 1h
+		}
+	}
 }
 
 *.apps.localhost {
 	tls internal
-	reverse_proxy proxy:80
+	reverse_proxy 127.0.0.1:8081
 }

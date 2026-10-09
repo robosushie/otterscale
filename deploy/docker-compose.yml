@@ -1,6 +1,6 @@
-# Console + Headscale behind Caddy (TLS on console.localhost / hs.localhost / *.apps.localhost).
+# Console + Headscale behind edge (Caddy TLS + Go tsnet).
 # SQLite for the Next.js app lives on the otterscale_data volume.
-# proxy is a Go tsnet node (hostname edge / tag:edge) that reverse-proxies published apps.
+# edge joins Headscale as hostname edge / tag:edge and reverse-proxies published apps.
 name: otterscale
 
 services:
@@ -8,8 +8,6 @@ services:
     image: headscale/headscale:0.23.0
     container_name: headscale
     hostname: headscale
-    # Windows Tailscale resolves its coordination server itself and cannot look up
-    # *.localhost. Bind Headscale on loopback so this PC can use http://127.0.0.1:8080.
     ports:
       - "127.0.0.1:8080:8080"
     command: serve
@@ -39,10 +37,11 @@ services:
       AUTH_SETUP_TOKEN: ${AUTH_SETUP_TOKEN:-}
       HEADSCALE_INTERNAL_URL: http://headscale:8080
       HEADSCALE_PUBLIC_URL: ${HEADSCALE_PUBLIC_URL:-https://hs.localhost}
+      OTTERSCALE_DOMAIN: ${OTTERSCALE_DOMAIN:-}
       HEADSCALE_API_KEY: ${HEADSCALE_API_KEY:-}
       APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
       APPS_ROUTES_PATH: /data/apps-caddy/routes.json
-      APPS_PROBE_URL: http://proxy:4180
+      APPS_PROBE_URL: http://edge:4180
     volumes:
       - otterscale_data:/data
       - apps_caddy_config:/data/apps-caddy
@@ -50,34 +49,27 @@ services:
       headscale:
         condition: service_started
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: caddy
-    hostname: caddy
+  edge:
+    build:
+      context: ..
+      dockerfile: deploy/edge/Dockerfile
+    container_name: edge
+    hostname: edge
     ports:
       - "80:80"
       - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - headscale
-
-  proxy:
-    build:
-      context: ..
-      dockerfile: deploy/proxy/Dockerfile
-    container_name: proxy
-    hostname: proxy
     environment:
       HEADSCALE_INTERNAL_URL: http://headscale:8080
       APPS_EDGE_AUTHKEY: ${APPS_EDGE_AUTHKEY:-}
       APPS_ROUTES_PATH: /data/apps-caddy/routes.json
       TS_STATE_DIR: /var/lib/tailscale
       TS_HOSTNAME: edge
+      LISTEN_ADDR: 127.0.0.1:8081
+      PROBE_ADDR: :4180
     volumes:
-      # Fresh tsnet state (do not reuse the old tailscaled apps_edge_state volume).
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
       - apps_proxy_state:/var/lib/tailscale
       - apps_caddy_config:/data/apps-caddy
     restart: unless-stopped

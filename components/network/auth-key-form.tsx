@@ -86,7 +86,7 @@ export function AuthKeyForm({
           </Field>
           <div className="flex flex-wrap items-center gap-3 pt-[22px]">
             <label className="flex items-center gap-2 text-sm normal-case">
-              <input type="checkbox" name="reusable" />
+              <input type="checkbox" name="reusable" defaultChecked />
               Reusable
             </label>
             <Button type="submit" disabled={pending}>

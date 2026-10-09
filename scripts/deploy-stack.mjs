@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-command stack deploy: Caddy + Headscale + Otterscale app (SQLite).
+ * One-command stack deploy: edge (Caddy + tsnet) + Headscale + Otterscale app (SQLite).
  * - Ensures .env (AUTH_SECRET, SQLite DATABASE_URL, public Headscale URL)
  * - Builds images and starts Compose
  * - Bootstraps Headscale user + API key into .env when HEADSCALE_API_KEY is empty
@@ -158,6 +158,21 @@ function getEnvValue(content, key) {
   return parseEnvFile(content).get(key)?.trim() ?? "";
 }
 
+const LOCAL_LOGIN_SERVER = "http://127.0.0.1:8080";
+
+function loginServerUrl(domain) {
+  const raw = (domain ?? "").trim();
+  if (!raw) return LOCAL_LOGIN_SERVER;
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).origin;
+    } catch {
+      return LOCAL_LOGIN_SERVER;
+    }
+  }
+  return `https://${raw.replace(/\/+$/, "")}`;
+}
+
 function setEnvValue(content, key, value) {
   return serializeEnvFile(content, new Map([[key, value]]));
 }
@@ -290,14 +305,18 @@ function parseProbePayload(text) {
 }
 
 function removeLegacyHop() {
-  console.log("Removing leftover edge/probe containers if present...");
-  spawnSync("docker", ["rm", "-f", "proxy", "edge", "probe", "apps-edge", "apps-probe", "apps-caddy"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: "pipe",
-    shell: process.platform === "win32",
-    windowsHide: true,
-  });
+  console.log("Removing leftover caddy/proxy/probe containers if present...");
+  spawnSync(
+    "docker",
+    ["rm", "-f", "caddy", "proxy", "edge", "probe", "apps-edge", "apps-probe", "apps-caddy"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: "pipe",
+      shell: process.platform === "win32",
+      windowsHide: true,
+    },
+  );
   spawnSync("docker", ["volume", "rm", "otterscale_apps_edge_state"], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -432,8 +451,8 @@ async function main() {
 
   removeLegacyHop();
 
-  console.log("Starting Headscale and Caddy...");
-  run("docker", ["compose", ...composeArgs(), "up", "-d", "--remove-orphans", "headscale", "caddy"], {
+  console.log("Starting Headscale...");
+  run("docker", ["compose", ...composeArgs(), "up", "-d", "--remove-orphans", "headscale"], {
     env: composeEnv,
   });
 
@@ -477,7 +496,7 @@ async function main() {
     console.log("Wrote APPS_EDGE_AUTHKEY to .env");
   }
 
-  console.log("Starting Otterscale app, public Caddy, and apps proxy (migrations run on container start)...");
+  console.log("Starting Otterscale app and edge (migrations run on container start)...");
   run(
     "docker",
     [
@@ -487,8 +506,7 @@ async function main() {
       "-d",
       "--remove-orphans",
       "app",
-      "caddy",
-      "proxy",
+      "edge",
       "--force-recreate",
     ],
     {
@@ -496,15 +514,16 @@ async function main() {
     },
   );
 
+  const loginServer = loginServerUrl(getEnvValue(envContent, "OTTERSCALE_DOMAIN"));
+
   console.log("\nStack is up:");
   console.log("  Console:   https://console.localhost  (first visit: /setup or sign-in)");
-  console.log("  Headscale: https://hs.localhost");
+  console.log(`  Headscale: ${loginServer}  (Tailscale login-server)`);
   console.log("  Apps:      https://{subdomain}.apps.localhost");
   console.log("  SQLite:    /data/otterscale.db in the app volume");
-  console.log("\nAdd to hosts if needed:  127.0.0.1 console.localhost hs.localhost");
-  console.log("Trust Caddy's local CA (Tailscale requires it):");
-  console.log("  docker exec caddy cat /data/caddy/pki/authorities/local/root.crt");
-  console.log("\nTailscale clients on this PC: tailscale up --login-server=http://127.0.0.1:8080 --auth-key=<from Machines UI>");
+  console.log("\nJoin a device from Machines:");
+  console.log("  tailscale logout");
+  console.log(`  tailscale up --login-server=${loginServer} --auth-key=<from Machines UI>`);
 }
 
 main().catch((err) => {
