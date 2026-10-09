@@ -23,10 +23,7 @@ export default async function AuditNetworkPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Network logs"
-        description="Machine online/offline snapshots from lastSeen polling, plus node and auth-key events. This is not a full packet log."
-      />
+      <PageHeader title="Network logs" description="Machine and auth-key events." />
       <AuditTable
         events={events.map((e) => ({
           id: e.id,

@@ -17,6 +17,7 @@ export async function syncMachinesFromHeadscale(
     const lastOnline = Boolean(node.online);
 
     if (!existing) {
+      const createdById = await inferMachineCreator(organizationId, node.user?.name);
       await prisma.machine.create({
         data: {
           organizationId,
@@ -26,6 +27,7 @@ export async function syncMachinesFromHeadscale(
           ipAddresses,
           lastOnline,
           lastSeenAt,
+          createdById,
         },
       });
       await appendAuditEvent({
@@ -40,14 +42,16 @@ export async function syncMachinesFromHeadscale(
     }
 
     const onlineChanged = existing.lastOnline !== lastOnline;
+    const createdById =
+      existing.createdById ?? (await inferMachineCreator(organizationId, node.user?.name));
     await prisma.machine.update({
       where: { id: existing.id },
       data: {
-        name: node.name || existing.name,
         hostname: node.hostname || existing.hostname,
         ipAddresses,
         lastOnline,
         lastSeenAt,
+        createdById,
       },
     });
     if (onlineChanged) {
@@ -61,6 +65,26 @@ export async function syncMachinesFromHeadscale(
       });
     }
   }
+}
+
+async function inferMachineCreator(
+  organizationId: string,
+  headscaleUser?: string,
+): Promise<string | null> {
+  const ident = headscaleUser?.trim();
+  if (ident) {
+    const matched = await prisma.user.findFirst({
+      where: { OR: [{ email: ident.toLowerCase() }, { username: ident }] },
+      select: { id: true },
+    });
+    if (matched) return matched.id;
+  }
+  const event = await prisma.auditEvent.findFirst({
+    where: { organizationId, action: "authkey.created", actorId: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: { actorId: true },
+  });
+  return event?.actorId ?? null;
 }
 
 export function parseIpAddresses(raw: string): string[] {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import type { Capability } from "@/types/roles";
 
 type NavChild = { href: string; label: string; capability: Capability };
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
       label: "Access controls",
       children: [
         { href: "/workspaces", label: "Workspaces", capability: "workspace.manage" },
+        { href: "/tags", label: "Tags", capability: "workspace.manage" },
         { href: "/policies", label: "Policies", capability: "workspace.policy" },
       ],
     },
@@ -101,9 +103,10 @@ function GroupSection({
         className={`flex w-full items-center gap-2 rounded-[6px] px-3.5 py-1.5 text-left text-[14px] text-off-black hover:bg-[color-mix(in_srgb,var(--color-ash)_40%,transparent)] ${childActive ? "font-medium" : ""}`}
       >
         <span className="flex-1">{group.label}</span>
-        <span className={`text-smoke transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>
-          ▸
-        </span>
+        <ChevronRight
+          className={`size-3.5 shrink-0 text-smoke transition-transform ${open ? "rotate-90" : ""}`}
+          aria-hidden
+        />
       </button>
       {open ? (
         <div className="flex flex-col">
