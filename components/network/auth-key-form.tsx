@@ -41,63 +41,54 @@ export function AuthKeyForm({
   }
 
   return (
-    <div>
-      <form className="flex flex-col gap-3" onSubmit={onSubmit}>
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="flex min-w-[12rem] flex-1 flex-col gap-1 text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black">
-            <span>Workspaces</span>
-            <CheckMenu
-              name="workspaceIds"
-              placeholder="Select workspaces"
-              options={workspaces.map((ws) => ({ id: ws.id, label: ws.name }))}
-            />
-            <span className="text-[12px] font-normal normal-case tracking-[-0.4px] text-smoke">
-              Required. Devices join these ACL groups.
-            </span>
-          </div>
-          <div className="flex min-w-[12rem] flex-1 flex-col gap-1 text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black">
-            <span>Tags</span>
-            <CheckMenu
-              name="tagIds"
-              placeholder="Select tags"
-              options={tags.map((tag) => ({ id: tag.id, label: `${tag.name} (${tag.aclTag})` }))}
-            />
-            <span className="text-[12px] font-normal normal-case tracking-[-0.4px] text-smoke">
-              Optional labels such as prod, uat, or custom.
-            </span>
-          </div>
-          <Field
-            label="Expiry"
-            className="min-w-[12rem]"
-            hint="Pick a preset or type 48h, 7d, or an ISO datetime."
-          >
-            <Input
-              name="expiration"
-              list="auth-key-expiry"
-              defaultValue={defaultExpiry}
-              autoComplete="off"
-              className="min-w-[12rem]"
-            />
-            <datalist id="auth-key-expiry">
-              {AUTH_KEY_EXPIRY_PRESETS.map((preset) => (
-                <option key={preset} value={preset} />
-              ))}
-            </datalist>
-          </Field>
-          <div className="flex flex-wrap items-center gap-3 pt-[22px]">
-            <label className="flex items-center gap-2 text-sm normal-case">
-              <input type="checkbox" name="reusable" defaultChecked />
-              Reusable
-            </label>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Generating…" : "Add device"}
-            </Button>
-          </div>
+    <div className="flex flex-col gap-4">
+      <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+        <div className="flex flex-col gap-1 text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black">
+          <span>Workspaces</span>
+          <CheckMenu
+            name="workspaceIds"
+            placeholder="Select workspaces"
+            options={workspaces.map((ws) => ({ id: ws.id, label: ws.name }))}
+          />
+          <span className="text-[12px] font-normal normal-case tracking-[-0.4px] text-smoke">
+            Required. Devices join these ACL groups.
+          </span>
         </div>
+        <div className="flex flex-col gap-1 text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black">
+          <span>Tags</span>
+          <CheckMenu
+            name="tagIds"
+            placeholder="Select tags"
+            options={tags.map((tag) => ({ id: tag.id, label: `${tag.name} (${tag.aclTag})` }))}
+          />
+          <span className="text-[12px] font-normal normal-case tracking-[-0.4px] text-smoke">
+            Optional labels such as prod, uat, or custom.
+          </span>
+        </div>
+        <Field label="Expiry" hint="Pick a preset or type 48h, 7d, or an ISO datetime.">
+          <Input
+            name="expiration"
+            list="auth-key-expiry"
+            defaultValue={defaultExpiry}
+            autoComplete="off"
+          />
+          <datalist id="auth-key-expiry">
+            {AUTH_KEY_EXPIRY_PRESETS.map((preset) => (
+              <option key={preset} value={preset} />
+            ))}
+          </datalist>
+        </Field>
+        <label className="flex items-center gap-2 text-sm font-normal normal-case tracking-normal">
+          <input type="checkbox" name="reusable" defaultChecked />
+          Reusable
+        </label>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Generating…" : "Add machine"}
+        </Button>
       </form>
-      {error && <p className="mt-3 text-sm text-off-black">{error}</p>}
-      {command && key && (
-        <div className="mt-4 rounded-[8px] border border-ash bg-paper p-4">
+      {error ? <p className="text-sm text-off-black">{error}</p> : null}
+      {command && key ? (
+        <div className="rounded-[8px] border border-ash bg-parchment p-4">
           <p className="text-[12px] uppercase tracking-[-0.4px] text-smoke">Register with Tailscale</p>
           <pre className="mt-2 overflow-x-auto text-sm whitespace-pre-wrap">{command}</pre>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -105,7 +96,7 @@ export function AuthKeyForm({
             <CopyButton text={key} label="Copy key" />
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -13,7 +13,7 @@ Full spec: [`docs/theme.md`](../../docs/theme.md). Implement tokens in `app/glob
 - Canvas `#f6f3f1` (parchment); text `#242424`; borders `#cecac8`.
 - Primary filled CTA: `#2b59d1` + parchment/white uppercase mono — one per screen.
 - Secondary filled: `#242424`. Ghost: 1px Off-Black border, transparent.
-- Headlines: Instrument Serif weight **400** only. Body/UI: IBM Plex Mono.
+- Headlines: Newsreader weight **400** only. Body/UI: IBM Plex Mono.
 - Buttons/inputs: 6px radius. Cards: 8px radius, 20px padding.
 - Console: left sidebar, single column, no bento grids.
 - No card `box-shadow`. Pastels (sky, mint, coral, gold) are decorative washes only.

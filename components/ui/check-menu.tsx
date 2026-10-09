@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { controlClassName } from "@/components/ui/field";
 
 export function CheckMenu({
@@ -26,15 +27,19 @@ export function CheckMenu({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     }
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      if (!open) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
     }
     document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
-  }, []);
+  }, [open]);
 
   const summary =
     selected.length === 0
@@ -59,14 +64,15 @@ export function CheckMenu({
         onClick={() => setOpen((value) => !value)}
       >
         <span className={selected.length === 0 ? "text-smoke" : ""}>{summary}</span>
-        <span aria-hidden className="text-smoke">
-          ▾
-        </span>
+        <ChevronDown
+          className={`size-3.5 shrink-0 text-smoke transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
       </button>
       {open ? (
         <div
           id={panelId}
-          className="absolute z-20 mt-1 max-h-48 w-full min-w-[12rem] overflow-auto rounded-[6px] border border-ash bg-parchment p-2"
+          className="absolute z-50 mt-1 max-h-48 w-full min-w-[12rem] overflow-auto rounded-[6px] border border-ash bg-parchment p-2"
         >
           {options.length === 0 ? (
             <p className="px-1 py-1 text-sm text-smoke normal-case">None yet</p>

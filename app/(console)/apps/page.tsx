@@ -4,12 +4,13 @@ import { prisma } from "@/lib/db";
 import { getDefaultOrganization } from "@/lib/org/singleton";
 import { loadAuthzContext } from "@/lib/authz/load-context";
 import { hasCapability } from "@/lib/authz/permissions";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { AddPanel } from "@/components/ui/side-panel";
 import { AppForm } from "@/components/apps/app-form";
-import { deleteAppForm } from "@/lib/actions/apps";
+import { AppsTable } from "@/components/apps/apps-table";
+import { isEdgeMachine } from "@/lib/machines/edge";
 import { machineVisibleToViewer } from "@/lib/machines/visibility";
+import { formatPerson } from "@/lib/console/person";
 
 export default async function AppsPage() {
   const session = await auth();
@@ -23,96 +24,79 @@ export default async function AppsPage() {
   const [machines, apps] = await Promise.all([
     prisma.machine.findMany({
       where: { organizationId: org.id },
-      include: { workspaces: true },
+      include: { workspaces: true, tags: { include: { tag: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.publishedApp.findMany({
       where: { organizationId: org.id },
-      include: { machine: { include: { workspaces: true } } },
+      include: {
+        createdBy: { select: { name: true, username: true, email: true } },
+        machine: { include: { workspaces: true, tags: { include: { tag: true } } } },
+      },
       orderBy: { subdomain: "asc" },
     }),
   ]);
 
-  const visibleMachines = machines.filter((m) =>
-    machineVisibleToViewer(
+  const listedMachines = machines.filter((m) => {
+    if (isEdgeMachine({ name: m.name, hostname: m.hostname, tags: m.tags.map((t) => t.tag.aclTag) })) {
+      return false;
+    }
+    return machineVisibleToViewer(
       m.workspaces.map((w) => w.groupId),
       authz,
-    ),
-  );
-  const visibleApps = apps.filter((app) =>
-    machineVisibleToViewer(
+    );
+  });
+  const visibleApps = apps.filter((app) => {
+    if (
+      isEdgeMachine({
+        name: app.machine.name,
+        hostname: app.machine.hostname,
+        tags: app.machine.tags.map((t) => t.tag.aclTag),
+      })
+    ) {
+      return false;
+    }
+    return machineVisibleToViewer(
       app.machine.workspaces.map((w) => w.groupId),
       authz,
-    ),
-  );
+    );
+  });
 
   return (
     <div>
       <PageHeader
         title="Apps"
-        description={`Publish a process on a mesh machine. The proxy reverse-proxies https://{subdomain}.${baseDomain} onto that node IP and port. This is not Funnel.`}
+        description="Processes published on mesh machines."
+        action={
+          canManage ? (
+            <AddPanel buttonLabel="Add app" title="Add app">
+              <AppForm
+                machines={listedMachines.map((m) => ({ id: m.id, name: m.name }))}
+                baseDomain={baseDomain}
+              />
+            </AddPanel>
+          ) : null
+        }
       />
 
-      {canManage ? (
-        <Card className="mb-8">
-          <h2 className="text-[24px]">Publish an app</h2>
-          <p className="mt-2 text-sm text-graphite">
-            The mesh proxy probes <code>{"{nodeIP}:{port}"}</code> at save time. Bind the process to
-            0.0.0.0 or the Tailscale IP, not localhost. Chrome resolves <code>*.apps.localhost</code>
-            ; Windows hosts files may need each name.
-          </p>
-          <AppForm
-            machines={visibleMachines.map((m) => ({ id: m.id, name: m.name }))}
-            baseDomain={baseDomain}
-          />
-        </Card>
-      ) : null}
-
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-ash">
-            <th className="py-2">URL</th>
-            <th>Machine</th>
-            <th>Port</th>
-            <th>Status</th>
-            {canManage ? <th></th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {visibleApps.map((app) => (
-            <tr key={app.id} className="border-b border-ash">
-              <td className="py-3">
-                <a className="link" href={`https://${app.subdomain}.${baseDomain}`}>
-                  {app.subdomain}.{baseDomain}
-                </a>
-              </td>
-              <td>{app.machine.name}</td>
-              <td className="tabular-nums">{app.port}</td>
-              <td>
-                {app.status}
-                {app.lastError ? <p className="text-smoke">{app.lastError}</p> : null}
-              </td>
-              {canManage ? (
-                <td>
-                  <form action={deleteAppForm}>
-                    <input type="hidden" name="appId" value={app.id} />
-                    <Button type="submit" variant="ghost" className="!min-h-0 text-sm">
-                      Remove
-                    </Button>
-                  </form>
-                </td>
-              ) : null}
-            </tr>
-          ))}
-          {visibleApps.length === 0 && (
-            <tr>
-              <td colSpan={canManage ? 5 : 4} className="py-4 text-smoke">
-                No published apps yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <p className="mb-3 text-[12px] text-smoke">
+        {visibleApps.length} {visibleApps.length === 1 ? "app" : "apps"}
+      </p>
+      <AppsTable
+        apps={visibleApps.map((app) => ({
+          id: app.id,
+          subdomain: app.subdomain,
+          port: app.port,
+          status: app.status,
+          lastError: app.lastError,
+          machineId: app.machineId,
+          machineName: app.machine.name,
+          addedBy: formatPerson(app.createdBy),
+        }))}
+        machines={listedMachines.map((m) => ({ id: m.id, name: m.name }))}
+        baseDomain={baseDomain}
+        canManage={canManage}
+      />
     </div>
   );
 }

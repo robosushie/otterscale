@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Otterscale features</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/theme.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <nav class="nav">
+        <a class="brand" href="./index.html">Otterscale</a>
+        <div class="nav-links">
+          <a href="./features.html" aria-current="page">Features</a>
+          <a href="./deploy.html">Deploy</a>
+          <a data-github href="https://github.com/robosushie/otterscale">GitHub</a>
+        </div>
+      </nav>
+
+      <header class="hero">
+        <div class="wash" aria-hidden="true"></div>
+        <div class="hero-copy fade">
+          <p class="caption">What ships today</p>
+          <h1>A console around Headscale.</h1>
+          <p class="lede">
+            Single tenant, SQLite, local login plus TOTP. Users join with official Tailscale
+            clients. Funnel, billing, and a custom VPN app are out of scope.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="./deploy.html">Deploy ▸</a>
+          </div>
+        </div>
+      </header>
+
+      <section class="section">
+        <header>
+          <h2>Modules</h2>
+          <p>Each card is a console area you can open after setup.</p>
+        </header>
+        <div class="grid modules">
+          <article class="card">
+            <h3>Machines</h3>
+            <p>List nodes, generate pre-auth keys, copy <code>tailscale logout</code> then <code>tailscale up</code>.</p>
+          </article>
+          <article class="card">
+            <h3>Network Apps</h3>
+            <p>Publish a mesh address on a hostname. Edge reverse-proxies onto 100.x. Not Funnel.</p>
+          </article>
+          <article class="card">
+            <h3>Users and roles</h3>
+            <p>Owner, Super admin, Admin, Member. Local credentials always on; OIDC when three env vars are set.</p>
+          </article>
+          <article class="card">
+            <h3>Workspaces</h3>
+            <p>Isolation unit. Maps to a Headscale ACL group. Peers that share a workspace can see each other.</p>
+          </article>
+          <article class="card">
+            <h3>Tags</h3>
+            <p>Orthogonal labels such as prod, uat, and dev. They are not isolation by themselves.</p>
+          </article>
+          <article class="card">
+            <h3>Policies</h3>
+            <p>Intent in the console compiles to Headscale HuJSON. Apply from Settings → Policy file.</p>
+          </article>
+          <article class="card">
+            <h3>Audit</h3>
+            <p>System and network logs with an append-only hash chain for control-plane actions.</p>
+          </article>
+          <article class="card">
+            <h3>Keys</h3>
+            <p>Reusable or one-shot auth keys bound to workspaces and tags. Edge uses a <code>tag:edge</code> key.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <header>
+          <h2>Architecture</h2>
+          <p>Browser and clients hit edge. Console talks to Headscale. Apps hop onto the mesh via tsnet.</p>
+        </header>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  browser[Browser]
+  clients[Tailscale clients]
+  edge[edge Caddy plus tsnet]
+  app[Console]
+  hs[Headscale]
+  mesh[Mesh 100.x]
+  browser --> edge
+  clients --> hs
+  edge --> app
+  edge --> hs
+  edge --> mesh
+  app --> hs
+          </pre>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <a href="./index.html">Home</a>
+        ·
+        <a href="./deploy.html">Deploy</a>
+        ·
+        <a data-github href="https://github.com/robosushie/otterscale">GitHub</a>
+      </footer>
+    </div>
+    <script src="./js/config.js"></script>
+    <script src="./js/nav.js"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          background: "#ffffff",
+          primaryColor: "#cfdaf5",
+          primaryTextColor: "#242424",
+          primaryBorderColor: "#cecac8",
+          lineColor: "#242424",
+          fontFamily: "IBM Plex Mono, monospace",
+        },
+      });
+    </script>
+  </body>
+</html>
