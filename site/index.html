@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Otterscale — team mesh control on Headscale</title>
+    <title>Otterscale — team mesh with no per-seat lock-in</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -33,12 +33,12 @@
         <div class="wash" data-wash aria-hidden="true"></div>
         <div class="hero-split">
           <div class="hero-copy" data-reveal>
-            <p class="caption">Open-source mesh control</p>
-            <h1>Team mesh without a per-seat lock-in.</h1>
+            <p class="caption">Open source · no per-seat lock-in</p>
+            <h1>A private mesh for the whole team.</h1>
             <p class="lede">
-              You do not need a custom VPN app. You do not need to hand-write HuJSON for every
-              hire. Otterscale is the console in front of Headscale — workspaces, roles, keys, and
-              Network Apps — with the Tailscale clients people already run.
+              Connect laptops, servers, and apps. Invite anyone without counting seats. People join
+              with the clients they already run. You grant, isolate, and revoke from a console you
+              host.
             </p>
             <div class="actions">
               <a class="btn btn-primary" href="./deploy.html">Deploy ▸</a>
@@ -52,28 +52,61 @@
       <section class="section">
         <div class="grid stats">
           <div class="stat" data-reveal>
+            <strong>No seat limit</strong>
+            <span>Invite the whole team</span>
+          </div>
+          <div class="stat d1" data-reveal>
             <strong>Open source</strong>
             <span>Self-host the control plane</span>
           </div>
-          <div class="stat d1" data-reveal>
-            <strong>3 containers</strong>
-            <span>Console, Headscale, edge</span>
-          </div>
           <div class="stat d2" data-reveal>
             <strong>One Compose file</strong>
-            <span>Otterscale Stack on any VM</span>
+            <span>Live on a VM this afternoon</span>
           </div>
         </div>
       </section>
 
       <section class="section" data-reveal>
         <div class="strip">
-          <p class="caption">Clients</p>
-          <h2>Official Tailscale clients only.</h2>
+          <p class="caption">Join a device</p>
+          <h2>Two commands. Clients people already have.</h2>
           <p>
-            No custom VPN app. People install the apps they already know; Add device prints
-            <code>tailscale logout</code> then <code>tailscale up</code> pointed at your login-server.
+            Add device prints the join path. No new VPN app to ship, train, or support. Compatible
+            with official Tailscale clients.
           </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <header data-reveal>
+          <h2>How it helps</h2>
+          <p>No seat math. Isolate who sees what. Reach machines and apps from anywhere.</p>
+        </header>
+        <div class="grid modules">
+          <article class="card" data-reveal>
+            <p class="caption">Scale</p>
+            <h3>No cap on users or devices</h3>
+            <p>
+              Invite all employees, freelancers, devices, and every server. Open source and
+              self-hosted — no per-seat lock-in, no node limit.
+            </p>
+          </article>
+          <article class="card d1" data-reveal>
+            <p class="caption">Access</p>
+            <h3>Isolate with workspaces and tags</h3>
+            <p>
+              Workspaces decide who can access which resource. Tags give granular visibility and
+              control. Give access controls to individual users.
+            </p>
+          </article>
+          <article class="card card-emphasis d2" data-reveal>
+            <p class="caption">Reach</p>
+            <h3>Devices and apps, from anywhere</h3>
+            <p>
+              Join once and reach every allowed machine on the mesh. Publish a local app on a custom
+              subdomain — HTTPS in front, traffic on 100.x.
+            </p>
+          </article>
         </div>
       </section>
 
@@ -104,29 +137,11 @@
         </div>
       </section>
 
-      <section class="section">
-        <header data-reveal>
-          <h2>Headscale is the engine. This is the product.</h2>
-          <p>CLI and HuJSON stay. Teams get a console that compiles intent, issues keys, and records who did what.</p>
-        </header>
-        <div class="grid compare">
-          <article class="card" data-reveal>
-            <p class="caption">Without Otterscale</p>
-            <h3>Hand-written policy</h3>
-            <p>Users, tags, and ACLs live in files. No roles, no audit trail, no copy-paste join command for the rest of the company.</p>
-          </article>
-          <article class="card card-emphasis d1" data-reveal>
-            <p class="caption">With Otterscale</p>
-            <h3>A role-based console</h3>
-            <p>Workspaces isolate peers. Tags label them. Owner through Member. Add device prints the two commands. Audit hashes the trail.</p>
-          </article>
-        </div>
-      </section>
-
       <section class="section close" data-reveal>
-        <h2>Pull the stack. Join a device.</h2>
+        <h2>Run it this afternoon.</h2>
         <p class="lede">
-          One Compose file on a cloud VM. Bootstrap mints the keys after Headscale is healthy.
+          One Compose file on a cloud VM. Open source. No per-seat lock-in. Bootstrap mints the keys
+          after Headscale is healthy.
         </p>
         <div class="actions">
           <a class="btn btn-secondary" href="./deploy.html">Otterscale Stack</a>
