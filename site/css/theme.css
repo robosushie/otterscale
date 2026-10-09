@@ -454,16 +454,16 @@ pre {
   max-width: 40rem;
 }
 
-.stack-card .caption-b {
-  display: none;
+.stack-card .stack-note {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: -0.28px;
+  color: var(--color-smoke);
 }
 
-.stack-card:hover .caption-a {
-  display: none;
-}
-
-.stack-card:hover .caption-b {
-  display: block;
+.stack-card h3 {
+  margin-top: 12px;
 }
 
 .compare {
