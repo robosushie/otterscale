@@ -35,6 +35,8 @@ jobs:
           cp deploy/otterscale-stack.env.example site/assets/otterscale-stack.env.example
 
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

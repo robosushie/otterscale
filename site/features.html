@@ -7,30 +7,36 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./css/theme.css" />
+    <link rel="stylesheet" href="./css/console-mock.css" />
   </head>
   <body>
-    <div class="wrap">
-      <nav class="nav">
-        <a class="brand" href="./index.html">Otterscale</a>
-        <div class="nav-links">
-          <a href="./features.html" aria-current="page">Features</a>
-          <a href="./deploy.html">Deploy</a>
-          <a data-github href="https://github.com/robosushie/otterscale">GitHub</a>
-        </div>
-      </nav>
+    <header class="site-bar">
+      <div class="wrap">
+        <nav class="nav" data-nav>
+          <a class="brand" href="./index.html">Otterscale</a>
+          <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false">Menu</button>
+          <div class="nav-links">
+            <a href="./features.html" aria-current="page">Features</a>
+            <a href="./deploy.html">Deploy</a>
+            <a data-github href="https://github.com/robosushie/otterscale">GitHub</a>
+          </div>
+        </nav>
+      </div>
+    </header>
 
-      <header class="hero">
-        <div class="wash" aria-hidden="true"></div>
-        <div class="hero-copy fade">
+    <div class="wrap">
+      <header class="hero" data-hero>
+        <div class="wash" data-wash aria-hidden="true"></div>
+        <div class="hero-copy" data-reveal>
           <p class="caption">What ships today</p>
           <h1>A console around Headscale.</h1>
           <p class="lede">
-            Single tenant, SQLite, local login plus TOTP. Users join with official Tailscale
-            clients. Funnel, billing, and a custom VPN app are out of scope.
+            Single tenant, SQLite, local login plus TOTP. Click through the dummy console — Machines,
+            Apps, Users, Workspaces, Policies, Audit, Keys — then see how traffic actually flows.
           </p>
           <div class="actions">
             <a class="btn btn-primary" href="./deploy.html">Deploy ▸</a>
@@ -39,40 +45,48 @@
       </header>
 
       <section class="section">
-        <header>
+        <header data-reveal>
+          <h2>Product tour</h2>
+          <p>Static mock of the real sidebar. Dummy rows only.</p>
+        </header>
+        <div data-reveal data-console-mock></div>
+      </section>
+
+      <section class="section">
+        <header data-reveal>
           <h2>Modules</h2>
           <p>Each card is a console area you can open after setup.</p>
         </header>
         <div class="grid modules">
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Machines</h3>
             <p>List nodes, generate pre-auth keys, copy <code>tailscale logout</code> then <code>tailscale up</code>.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Network Apps</h3>
             <p>Publish a mesh address on a hostname. Edge reverse-proxies onto 100.x. Not Funnel.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Users and roles</h3>
             <p>Owner, Super admin, Admin, Member. Local credentials always on; OIDC when three env vars are set.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Workspaces</h3>
-            <p>Isolation unit. Maps to a Headscale ACL group. Peers that share a workspace can see each other.</p>
+            <p>Isolation unit. Maps to a Headscale ACL group. Peers that share a workspace see each other.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Tags</h3>
             <p>Orthogonal labels such as prod, uat, and dev. They are not isolation by themselves.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Policies</h3>
             <p>Intent in the console compiles to Headscale HuJSON. Apply from Settings → Policy file.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Audit</h3>
             <p>System and network logs with an append-only hash chain for control-plane actions.</p>
           </article>
-          <article class="card">
+          <article class="card" data-reveal>
             <h3>Keys</h3>
             <p>Reusable or one-shot auth keys bound to workspaces and tags. Edge uses a <code>tag:edge</code> key.</p>
           </article>
@@ -80,27 +94,11 @@
       </section>
 
       <section class="section">
-        <header>
+        <header data-reveal>
           <h2>Architecture</h2>
-          <p>Browser and clients hit edge. Console talks to Headscale. Apps hop onto the mesh via tsnet.</p>
+          <p>Hover a box to light the paths. Browser and clients enter at the edge; apps land on the mesh.</p>
         </header>
-        <div class="diagram">
-          <pre class="mermaid">
-flowchart LR
-  browser[Browser]
-  clients[Tailscale clients]
-  edge[edge Caddy plus tsnet]
-  app[Console]
-  hs[Headscale]
-  mesh[Mesh 100.x]
-  browser --> edge
-  clients --> hs
-  edge --> app
-  edge --> hs
-  edge --> mesh
-  app --> hs
-          </pre>
-        </div>
+        <div class="diagram arch" data-arch data-reveal></div>
       </section>
 
       <footer class="footer">
@@ -113,20 +111,8 @@ flowchart LR
     </div>
     <script src="./js/config.js"></script>
     <script src="./js/nav.js"></script>
-    <script type="module">
-      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-      mermaid.initialize({
-        startOnLoad: true,
-        theme: "base",
-        themeVariables: {
-          background: "#ffffff",
-          primaryColor: "#cfdaf5",
-          primaryTextColor: "#242424",
-          primaryBorderColor: "#cecac8",
-          lineColor: "#242424",
-          fontFamily: "IBM Plex Mono, monospace",
-        },
-      });
-    </script>
+    <script src="./js/landing.js"></script>
+    <script src="./js/console-mock.js"></script>
+    <script src="./js/arch.js"></script>
   </body>
 </html>
