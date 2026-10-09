@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { loadUserCapabilities } from "@/lib/authz/load-context";
 import { getDefaultOrganization } from "@/lib/org/singleton";
+import { Save, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { addSuperAdmin, removeSuperAdmin, updateOrgSettings } from "@/lib/actions/platform";
@@ -28,7 +29,7 @@ export default async function SettingsGeneralPage() {
 
   return (
     <div>
-      <PageHeader title="General" description="Organisation display name, tailnet id, owner, and super admins." />
+      <PageHeader title="General" description="Organisation name, owner, and super admins." />
 
       <Card className="mb-6">
         <h2 className="text-[24px]">Organisation</h2>
@@ -57,8 +58,8 @@ export default async function SettingsGeneralPage() {
                 className={controlClassName}
               />
             </label>
-            <Button type="submit" variant="secondary" className="self-start">
-              Save
+            <Button type="submit" variant="secondary" icon aria-label="Save organisation" className="self-start">
+              <Save className="size-3.5" />
             </Button>
           </form>
         ) : (
@@ -81,8 +82,8 @@ export default async function SettingsGeneralPage() {
               {ctx.isOwner && m.user.id !== session.user.id && (
                 <form action={removeSuperAdmin}>
                   <input type="hidden" name="userId" value={m.user.id} />
-                  <Button type="submit" variant="ghost" className="!min-h-0 text-sm">
-                    Remove
+                  <Button type="submit" variant="ghost" icon aria-label={`Remove ${m.user.email}`} className="!min-h-0">
+                    <X className="size-3.5" />
                   </Button>
                 </form>
               )}

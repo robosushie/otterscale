@@ -3,7 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckMenu } from "@/components/ui/check-menu";
-import { controlClassName } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import type { CreateInviteResult } from "@/lib/actions/members";
 import { createUserInvite, revokeUserInvite } from "@/lib/actions/members";
 
@@ -22,12 +22,10 @@ function roleLabel(invite: PendingInvite) {
   return "Member";
 }
 
-export function InvitePanel({
-  pendingInvites,
+export function InviteForm({
   workspaces,
   canAssignSuperAdmin,
 }: {
-  pendingInvites: PendingInvite[];
   workspaces: { id: string; name: string }[];
   canAssignSuperAdmin: boolean;
 }) {
@@ -55,75 +53,106 @@ export function InvitePanel({
   }
 
   return (
-    <div>
-      <form onSubmit={onCreate} className="mt-4 flex flex-wrap items-end gap-3">
-        <input
-          name="email"
-          type="email"
-          placeholder="email@example.com"
-          className={`${controlClassName} mt-0 w-56`}
-          required
-        />
-        <input
-          name="username"
-          placeholder="username"
-          className={`${controlClassName} mt-0 w-40`}
-          required
-        />
-        <select name="role" className={`${controlClassName} mt-0 w-40`} defaultValue="MEMBER">
-          {canAssignSuperAdmin ? <option value="SUPER_ADMIN">Super admin</option> : null}
-          <option value="ADMIN">Admin</option>
-          <option value="MEMBER">Member</option>
-        </select>
-        <div className="w-56">
+    <div className="flex flex-col gap-4">
+      <form onSubmit={onCreate} className="flex flex-col gap-4">
+        <Field label="Email">
+          <Input name="email" type="email" placeholder="email@example.com" required />
+        </Field>
+        <Field label="Username">
+          <Input name="username" placeholder="username" required />
+        </Field>
+        <Field label="Role">
+          <Select name="role" defaultValue="MEMBER">
+            {canAssignSuperAdmin ? <option value="SUPER_ADMIN">Super admin</option> : null}
+            <option value="ADMIN">Admin</option>
+            <option value="MEMBER">Member</option>
+          </Select>
+        </Field>
+        <div className="flex flex-col gap-1 text-[12px] font-medium uppercase tracking-[-0.4px] text-off-black">
+          <span>Workspaces</span>
           <CheckMenu
             key={menuKey}
             name="workspaceIds"
-            placeholder="Workspaces"
+            placeholder="Select workspaces"
             options={workspaces.map((workspace) => ({ id: workspace.id, label: workspace.name }))}
           />
         </div>
-        <Button type="submit" variant="secondary" disabled={pending}>
-          Create invite
+        <Button type="submit" disabled={pending}>
+          {pending ? "Creating…" : "Add user"}
         </Button>
       </form>
-      {error && <p className="mt-2 text-sm">{error}</p>}
-      {lastInvite && (
-        <div className="mt-4 rounded-[8px] border border-ash bg-periwinkle-mist p-4 text-sm">
+      {error ? <p className="text-sm text-off-black">{error}</p> : null}
+      {lastInvite ? (
+        <div className="rounded-[8px] border border-ash bg-periwinkle-mist p-4 text-sm">
           <p className="font-[540]">Copy this invite code now. It will not be shown again.</p>
           <p className="mt-2 break-all font-mono">{lastInvite.code}</p>
-          <p className="mt-2 text-graphite">
-            On the sign-in page, choose Create account and enter this code.
-          </p>
+          <p className="mt-2 text-graphite">On the sign-in page, choose Create account and enter this code.</p>
         </div>
-      )}
-      {pendingInvites.length > 0 && (
-        <ul className="mt-6 space-y-2 text-sm">
-          {pendingInvites.map((inv) => (
-            <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-ash py-2">
-              <span>
-                {inv.email} · @{inv.username} · {roleLabel(inv)} · expires{" "}
-                {new Date(inv.expiresAt).toLocaleDateString()}
-              </span>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const formData = new FormData(event.currentTarget);
-                  startTransition(async () => {
-                    const result = await revokeUserInvite(formData);
-                    if (!result.ok) setError(result.error);
-                  });
-                }}
-              >
-                <input type="hidden" name="inviteId" value={inv.id} />
-                <Button type="submit" variant="secondary" className="!min-h-0 !py-1 text-xs">
-                  Revoke
-                </Button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+export function PendingInvitesTable({ pendingInvites }: { pendingInvites: PendingInvite[] }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (pendingInvites.length === 0 && !error) return null;
+
+  return (
+    <section className="mt-10">
+      <p className="mb-3 text-[12px] text-smoke">
+        {pendingInvites.length} pending {pendingInvites.length === 1 ? "invite" : "invites"}
+      </p>
+      {error ? <p className="mb-3 text-sm text-off-black">{error}</p> : null}
+      <table className="console-table w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-ash">
+            <th>Email</th>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Expires</th>
+            <th className="actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {pendingInvites.map((inv) => (
+            <tr key={inv.id} className="border-b border-ash">
+              <td>
+                <div className="cell">{inv.email}</div>
+              </td>
+              <td>
+                <div className="cell">@{inv.username}</div>
+              </td>
+              <td>
+                <div className="cell">{roleLabel(inv)}</div>
+              </td>
+              <td>
+                <div className="cell tabular-nums">{new Date(inv.expiresAt).toLocaleDateString()}</div>
+              </td>
+              <td className="actions">
+                <div className="cell-end">
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const formData = new FormData(event.currentTarget);
+                      startTransition(async () => {
+                        const result = await revokeUserInvite(formData);
+                        if (!result.ok) setError(result.error);
+                      });
+                    }}
+                  >
+                    <input type="hidden" name="inviteId" value={inv.id} />
+                    <Button type="submit" variant="ghost" disabled={pending}>
+                      Revoke
+                    </Button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

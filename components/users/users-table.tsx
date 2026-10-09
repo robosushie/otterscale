@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { Pencil, Save, Trash2 } from "lucide-react";
 import { deleteConsoleUser, updateUserAccess } from "@/lib/actions/members";
 import { Button } from "@/components/ui/button";
 import { CheckMenu } from "@/components/ui/check-menu";
@@ -78,17 +79,17 @@ export function UsersTable({
         placeholder="Search users…"
         className={`${controlClassName} mt-0 max-w-xl`}
       />
-      <p className="mt-4 mb-3 inline-flex rounded-[9999px] border border-ash px-2 py-1 text-[12px] text-smoke">
+      <p className="mt-4 mb-3 text-[12px] text-smoke">
         {filtered.length} {filtered.length === 1 ? "user" : "users"}
       </p>
       {error ? <p className="mb-3 text-sm text-off-black">{error}</p> : null}
-      <table className="w-full text-left text-sm">
+      <table className="console-table w-full text-left text-sm">
         <thead>
           <tr className="border-b border-ash">
-            <th className="py-2">User</th>
+            <th>User</th>
             <th>Role</th>
             <th>Joined</th>
-            {canManage ? <th></th> : null}
+            {canManage ? <th className="actions"></th> : null}
           </tr>
         </thead>
         <tbody>
@@ -99,54 +100,83 @@ export function UsersTable({
               (user.roleKey === "SUPER_ADMIN" && !canAssignSuperAdmin);
             const editing = editingId === user.id;
             return (
-              <tr key={user.id} className="border-b border-ash align-top">
-                <td className="py-3">
-                  <p className="font-medium">{user.name}</p>
-                  <p className="text-smoke">{user.email}</p>
-                  {editing ? (
-                    <form id={`user-${user.id}`} onSubmit={onSave} className="mt-3 flex max-w-md flex-col gap-3">
-                      <input type="hidden" name="userId" value={user.id} />
-                      <select
-                        name="role"
-                        className={`${controlClassName} mt-0`}
-                        defaultValue={user.roleKey === "SUPER_ADMIN" ? "SUPER_ADMIN" : user.roleKey}
-                      >
-                        {canAssignSuperAdmin ? <option value="SUPER_ADMIN">Super admin</option> : null}
-                        <option value="ADMIN">Admin</option>
-                        <option value="MEMBER">Member</option>
-                      </select>
-                      <CheckMenu
-                        name="workspaceIds"
-                        placeholder="Workspaces"
-                        defaultSelected={user.workspaceIds}
-                        options={workspaces.map((workspace) => ({
-                          id: workspace.id,
-                          label: workspace.name,
-                        }))}
-                      />
-                    </form>
-                  ) : null}
+              <tr key={user.id} className="border-b border-ash">
+                <td>
+                  <div className="cell-stack">
+                    <p className="font-medium">{user.name}</p>
+                    <p className="text-smoke">{user.email}</p>
+                    {editing ? (
+                      <form id={`user-${user.id}`} onSubmit={onSave} className="mt-3 flex max-w-md flex-col gap-3">
+                        <input type="hidden" name="userId" value={user.id} />
+                        <select
+                          name="role"
+                          className={`${controlClassName} mt-0`}
+                          defaultValue={user.roleKey === "SUPER_ADMIN" ? "SUPER_ADMIN" : user.roleKey}
+                        >
+                          {canAssignSuperAdmin ? <option value="SUPER_ADMIN">Super admin</option> : null}
+                          <option value="ADMIN">Admin</option>
+                          <option value="MEMBER">Member</option>
+                        </select>
+                        <CheckMenu
+                          name="workspaceIds"
+                          placeholder="Workspaces"
+                          defaultSelected={user.workspaceIds}
+                          options={workspaces.map((workspace) => ({
+                            id: workspace.id,
+                            label: workspace.name,
+                          }))}
+                        />
+                      </form>
+                    ) : null}
+                  </div>
                 </td>
-                <td className="py-3">{user.role}</td>
-                <td className="py-3 tabular-nums">{user.joined}</td>
+                <td>
+                  <div className="cell">{user.role}</div>
+                </td>
+                <td>
+                  <div className="cell tabular-nums">{user.joined}</div>
+                </td>
                 {canManage ? (
-                  <td className="py-3">
-                    {locked ? null : editing ? (
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="submit" form={`user-${user.id}`} variant="secondary" disabled={pending}>
-                          Save
+                  <td className="actions">
+                    {locked ? (
+                      <div className="cell-end" />
+                    ) : editing ? (
+                      <div className="cell-end">
+                        <Button
+                          type="submit"
+                          form={`user-${user.id}`}
+                          variant="secondary"
+                          icon
+                          aria-label={`Save ${user.name}`}
+                          disabled={pending}
+                        >
+                          <Save className="size-3.5" />
                         </Button>
                         <Button type="button" variant="ghost" disabled={pending} onClick={() => setEditingId(null)}>
                           Cancel
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="secondary" disabled={pending} onClick={() => setEditingId(user.id)}>
-                          Edit
+                      <div className="cell-end">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          icon
+                          aria-label={`Edit ${user.name}`}
+                          disabled={pending}
+                          onClick={() => setEditingId(user.id)}
+                        >
+                          <Pencil className="size-3.5" />
                         </Button>
-                        <Button type="button" variant="ghost" disabled={pending} onClick={() => onDelete(user)}>
-                          Delete
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          icon
+                          aria-label={`Delete ${user.email}`}
+                          disabled={pending}
+                          onClick={() => onDelete(user)}
+                        >
+                          <Trash2 className="size-3.5" />
                         </Button>
                       </div>
                     )}
@@ -157,8 +187,8 @@ export function UsersTable({
           })}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={canManage ? 4 : 3} className="py-4 text-smoke">
-                No users match this search.
+              <td colSpan={canManage ? 4 : 3}>
+                <div className="cell text-smoke">No users match this search.</div>
               </td>
             </tr>
           )}

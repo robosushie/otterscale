@@ -8,28 +8,36 @@ type AuditRow = {
 
 export function AuditTable({ events, empty }: { events: AuditRow[]; empty: string }) {
   return (
-    <table className="w-full text-left text-sm tabular-nums">
+    <table className="console-table w-full text-left text-sm tabular-nums">
       <thead>
         <tr className="border-b border-ash">
-          <th className="py-2 pr-4">Time</th>
-          <th className="pr-4">Action</th>
-          <th className="pr-4">Actor</th>
+          <th>Time</th>
+          <th>Action</th>
+          <th>Actor</th>
           <th>Hash</th>
         </tr>
       </thead>
       <tbody>
         {events.map((e) => (
           <tr key={e.id} className="border-b border-ash">
-            <td className="py-2 pr-4 whitespace-nowrap">{e.createdAt.toISOString()}</td>
-            <td className="pr-4">{e.action}</td>
-            <td className="pr-4">{e.actorEmail ?? "—"}</td>
-            <td className="font-mono text-xs">{e.eventHash.slice(0, 12)}…</td>
+            <td>
+              <div className="cell whitespace-nowrap">{e.createdAt.toISOString()}</div>
+            </td>
+            <td>
+              <div className="cell">{e.action}</div>
+            </td>
+            <td>
+              <div className="cell">{e.actorEmail ?? "—"}</div>
+            </td>
+            <td>
+              <div className="cell font-mono text-xs">{e.eventHash.slice(0, 12)}…</div>
+            </td>
           </tr>
         ))}
         {events.length === 0 && (
           <tr>
-            <td colSpan={4} className="py-4 text-smoke">
-              {empty}
+            <td colSpan={4}>
+              <div className="cell text-smoke">{empty}</div>
             </td>
           </tr>
         )}

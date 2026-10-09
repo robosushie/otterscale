@@ -5,9 +5,9 @@ import { getDefaultOrganization } from "@/lib/org/singleton";
 import { loadAuthzContext } from "@/lib/authz/load-context";
 import { hasCapability } from "@/lib/authz/permissions";
 import { displayUserRole, accessRoleKey } from "@/lib/console/user-role";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { InvitePanel } from "@/components/auth/invite-panel";
+import { AddPanel } from "@/components/ui/side-panel";
+import { InviteForm, PendingInvitesTable } from "@/components/auth/invite-panel";
 import { UsersTable } from "@/components/users/users-table";
 
 export default async function UsersPage() {
@@ -62,22 +62,18 @@ export default async function UsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Manage the users in your network and their permissions."
+        description="People on this tailnet and their access."
+        action={
+          canInvite ? (
+            <AddPanel buttonLabel="Add user" title="Add user">
+              <InviteForm
+                workspaces={workspaceOptions}
+                canAssignSuperAdmin={hasCapability(authz.capabilities, "platform.manage_admins")}
+              />
+            </AddPanel>
+          ) : null
+        }
       />
-
-      {canInvite && (
-        <Card className="mb-8">
-          <h2 className="text-[24px]">Invite users</h2>
-          <p className="mt-2 text-sm text-graphite">
-            Generate a one-time invite code. The person enters it on the sign-in page under Create account.
-          </p>
-          <InvitePanel
-            pendingInvites={pendingInvites}
-            workspaces={workspaceOptions}
-            canAssignSuperAdmin={hasCapability(authz.capabilities, "platform.manage_admins")}
-          />
-        </Card>
-      )}
 
       <UsersTable
         users={rows}
@@ -86,6 +82,8 @@ export default async function UsersPage() {
         canAssignSuperAdmin={hasCapability(authz.capabilities, "platform.manage_admins")}
         currentUserId={authz.userId}
       />
+
+      {canInvite ? <PendingInvitesTable pendingInvites={pendingInvites} /> : null}
     </div>
   );
 }

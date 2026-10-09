@@ -21,6 +21,7 @@ async function applyPolicyQuiet(actorId: string) {
 
 function revalidateAccess() {
   revalidatePath("/workspaces");
+  revalidatePath("/tags");
   revalidatePath("/policies");
   revalidatePath("/machines");
   revalidatePath("/users");

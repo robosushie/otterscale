@@ -76,7 +76,8 @@ export async function createAuthKey(formData: FormData): Promise<ActionResult<st
       afterJson: { workspaceIds, tagIds, reusable, aclTags },
     });
 
-    revalidateMachines();
+    revalidatePath("/settings/keys");
+    revalidatePath("/audit/network");
     return ok(key);
   } catch (e) {
     return fail(formatHeadscaleError(e));
@@ -140,7 +141,10 @@ export async function updateMachine(formData: FormData): Promise<ActionResult<vo
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.machine.update({ where: { id: machineId }, data: { name } });
+    await tx.machine.update({
+      where: { id: machineId },
+      data: { name, createdById: machine.createdById ?? session.user.id },
+    });
     await tx.machineWorkspace.deleteMany({ where: { machineId } });
     await tx.machineTag.deleteMany({ where: { machineId } });
     if (workspaceIds.length) {

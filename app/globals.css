@@ -100,6 +100,70 @@ a.link:hover {
   text-decoration: underline;
 }
 
+.console-table {
+  border-collapse: collapse;
+  height: 1px;
+}
+
+.console-table th,
+.console-table td {
+  vertical-align: middle;
+}
+
+.console-table tbody tr {
+  height: 100%;
+}
+
+.console-table th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-right: 20px;
+}
+
+.console-table td {
+  height: 100%;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-right: 20px;
+}
+
+.console-table th:last-child,
+.console-table td:last-child {
+  padding-right: 0;
+}
+
+.console-table th.actions,
+.console-table td.actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.console-table .cell,
+.console-table .cell-end,
+.console-table .cell-stack {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 2.25rem;
+  height: 100%;
+  min-width: 0;
+}
+
+.console-table .cell,
+.console-table .cell-end {
+  align-items: center;
+}
+
+.console-table .cell-end {
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.console-table .cell-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
 input,
 select,
 textarea {

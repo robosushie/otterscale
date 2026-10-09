@@ -11,6 +11,7 @@ import { parseIpAddresses, preferMeshIp } from "@/lib/machines/sync";
 import { probeAppListenAddress, writeAppsRoutes } from "@/lib/apps/publish";
 import { compileAndApply } from "@/lib/services/policy-apply";
 import { fail, ok, okVoid, type ActionResult } from "@/lib/actions/result";
+import { isEdgeMachine } from "@/lib/machines/edge";
 
 function revalidateApps() {
   revalidatePath("/apps");
@@ -35,6 +36,7 @@ export async function publishApp(formData: FormData): Promise<ActionResult<{ sta
   const session = await requireSession();
   await requireCapability(session.user.id, "network.manage");
   const org = await getDefaultOrganization();
+  const appId = String(formData.get("appId") ?? "").trim();
   const machineId = String(formData.get("machineId") ?? "");
   const port = Number(formData.get("port"));
   const subdomain = sanitizeSubdomain(String(formData.get("subdomain") ?? ""));
@@ -44,42 +46,68 @@ export async function publishApp(formData: FormData): Promise<ActionResult<{ sta
 
   const machine = await prisma.machine.findUnique({ where: { id: machineId } });
   if (!machine) return fail("Machine not found");
+  if (isEdgeMachine({ name: machine.name, hostname: machine.hostname })) {
+    return fail("Edge nodes cannot host published apps.");
+  }
   const ip = preferMeshIp(parseIpAddresses(machine.ipAddresses));
   if (!ip) return fail("Machine has no mesh IP yet. Wait until it is online.");
 
   const probe = await probeAppListenAddress(ip, port);
   const status = probe.ok ? PublishedAppStatus.ACTIVE : PublishedAppStatus.UNREACHABLE;
+  const lastError = probe.ok ? null : probe.error ?? "Unreachable";
 
-  const app = await prisma.publishedApp.upsert({
-    where: { organizationId_subdomain: { organizationId: org.id, subdomain } },
-    create: {
-      organizationId: org.id,
-      machineId,
-      port,
-      subdomain,
-      status,
-      lastError: probe.ok ? null : probe.error ?? "Unreachable",
-    },
-    update: {
-      machineId,
-      port,
-      status,
-      lastError: probe.ok ? null : probe.error ?? "Unreachable",
-    },
-  });
+  let app;
+  if (appId) {
+    const existing = await prisma.publishedApp.findFirst({
+      where: { id: appId, organizationId: org.id },
+    });
+    if (!existing) return fail("App not found");
+    if (subdomain !== existing.subdomain) {
+      const clash = await prisma.publishedApp.findFirst({
+        where: { organizationId: org.id, subdomain },
+      });
+      if (clash) return fail("Subdomain already published");
+    }
+    app = await prisma.publishedApp.update({
+      where: { id: appId },
+      data: {
+        machineId,
+        port,
+        subdomain,
+        status,
+        lastError,
+        createdById: existing.createdById ?? session.user.id,
+      },
+    });
+  } else {
+    app = await prisma.publishedApp.upsert({
+      where: { organizationId_subdomain: { organizationId: org.id, subdomain } },
+      create: {
+        organizationId: org.id,
+        machineId,
+        port,
+        subdomain,
+        status,
+        lastError,
+        createdById: session.user.id,
+      },
+      update: { machineId, port, status, lastError },
+    });
+  }
 
   await writeAppsRoutes(org.id);
   await appendAuditEvent({
     organizationId: org.id,
     actorId: session.user.id,
-    action: "app.published",
+    action: appId ? "app.updated" : "app.published",
     category: AuditCategory.NETWORK,
     resourceType: "published_app",
     resourceId: app.id,
     afterJson: { subdomain, port, machineId, status },
   });
   await applyPolicyQuiet(session.user.id);
-  revalidateApps();
+  if (appId) revalidateApps();
+  else revalidatePath("/policies");
   if (!probe.ok) {
     return ok({ status, error: probe.error ?? "Unreachable from the mesh proxy" });
   }

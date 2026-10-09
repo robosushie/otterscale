@@ -27,7 +27,7 @@ export default async function AuditSystemPage() {
     <div>
       <PageHeader
         title="System logs"
-        description="Append-only control-plane log (users, policy, settings) with hash chain integrity. Not a packet capture."
+        description="Control-plane events with hash-chain integrity."
         action={
           <Link href="/api/v1/audit/export">
             <Button variant="secondary">Export JSONL</Button>

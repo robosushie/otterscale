@@ -60,6 +60,8 @@ model User {
   auditEvents           AuditEvent[]          @relation("AuditActor")
   invitesCreated        UserInvite[]          @relation("InviteCreator")
   invitesRedeemed       UserInvite[]          @relation("InviteRedeemer")
+  machinesCreated       Machine[]             @relation("MachineCreator")
+  appsCreated           PublishedApp[]        @relation("AppCreator")
 }
 
 model UserInvite {
@@ -256,10 +258,12 @@ model Machine {
   ipAddresses     String    @default("[]")
   lastOnline      Boolean   @default(false)
   lastSeenAt      DateTime?
+  createdById     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?              @relation("MachineCreator", fields: [createdById], references: [id], onDelete: SetNull)
   workspaces   MachineWorkspace[]
   tags         MachineTag[]
   apps         PublishedApp[]
@@ -308,10 +312,12 @@ model PublishedApp {
   subdomain      String
   status         PublishedAppStatus @default(PENDING)
   lastError      String?
+  createdById    String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("AppCreator", fields: [createdById], references: [id], onDelete: SetNull)
   machine      Machine      @relation(fields: [machineId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, subdomain])

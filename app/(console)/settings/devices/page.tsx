@@ -4,6 +4,7 @@ import { loadAuthzContext } from "@/lib/authz/load-context";
 import { hasCapability } from "@/lib/authz/permissions";
 import { getDefaultOrganization } from "@/lib/org/singleton";
 import { updateDeviceSettings } from "@/lib/actions/platform";
+import { Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,10 +19,7 @@ export default async function SettingsDevicesPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Device management"
-        description="Default auth-key expiry. Device approval is off: nodes that present a valid key join without a second click."
-      />
+      <PageHeader title="Device management" description="Default auth-key expiry for new devices." />
       <Card>
         <form action={updateDeviceSettings} className="flex max-w-md flex-col gap-4">
           <label className="text-sm">
@@ -38,8 +36,8 @@ export default async function SettingsDevicesPage() {
             <input type="checkbox" disabled />
             Require device approval (not in Phase 1–2)
           </label>
-          <Button type="submit" variant="secondary" className="self-start">
-            Save
+          <Button type="submit" variant="secondary" icon aria-label="Save device settings" className="self-start">
+            <Save className="size-3.5" />
           </Button>
         </form>
       </Card>

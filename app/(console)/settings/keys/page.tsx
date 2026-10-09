@@ -26,41 +26,48 @@ export default async function SettingsKeysPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Keys"
-        description="Pre-auth keys issued for tagged-devices. Generate new keys from Machines → Add device."
-      />
+      <PageHeader title="Keys" description="Pre-auth keys issued for device join." />
       {error ? (
         <Card>
           <p className="text-graphite">{error}</p>
         </Card>
       ) : (
-        <table className="w-full text-left text-sm">
+        <table className="console-table w-full text-left text-sm">
           <thead>
             <tr className="border-b border-ash">
-              <th className="py-2">Key</th>
+              <th>Key</th>
               <th>Reusable</th>
               <th>Tags</th>
               <th>Expires</th>
-              <th></th>
+              <th className="actions"></th>
             </tr>
           </thead>
           <tbody>
             {keys.map((k) => (
               <tr key={k.id || k.key} className="border-b border-ash">
-                <td className="py-3 font-mono text-xs">{k.key ? `${k.key.slice(0, 12)}…` : k.id}</td>
-                <td>{k.reusable ? "Yes" : "No"}</td>
-                <td>{k.aclTags?.join(", ") || "—"}</td>
-                <td className="tabular-nums">{k.expiration ? new Date(k.expiration).toLocaleString() : "—"}</td>
-                <td className="py-3">
-                  <ExpireKeyButton authKey={k.key} />
+                <td>
+                  <div className="cell font-mono text-xs">{k.key ? `${k.key.slice(0, 12)}…` : k.id}</div>
+                </td>
+                <td>
+                  <div className="cell">{k.reusable ? "Yes" : "No"}</div>
+                </td>
+                <td>
+                  <div className="cell">{k.aclTags?.join(", ") || "—"}</div>
+                </td>
+                <td>
+                  <div className="cell tabular-nums">{k.expiration ? new Date(k.expiration).toLocaleString() : "—"}</div>
+                </td>
+                <td className="actions">
+                  <div className="cell-end">
+                    <ExpireKeyButton authKey={k.key} />
+                  </div>
                 </td>
               </tr>
             ))}
             {keys.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-4 text-smoke">
-                  No auth keys yet.
+                <td colSpan={5}>
+                  <div className="cell text-smoke">No auth keys yet.</div>
                 </td>
               </tr>
             )}
