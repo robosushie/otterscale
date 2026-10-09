@@ -4,7 +4,7 @@ Open-source team mesh control platform on [Headscale](https://github.com/juanfon
 
 ## Console (Next.js + Prisma)
 
-Single-tenant control plane: **SQLite** via `DATABASE_URL`, **Auth.js** (local email/username/password + TOTP always on; OIDC when issuer, client id, and client secret are set), policy compiler, audit log, and Headscale API integration. Docker puts **Caddy** in front: `https://console.localhost` (UI) and `https://hs.localhost` (Tailscale login-server).
+Single-tenant control plane: **SQLite** via `DATABASE_URL`, **Auth.js** (local email/username/password + TOTP always on; OIDC when issuer, client id, and client secret are set), policy compiler, audit log, and Headscale API integration. Docker puts **`edge`** in front (Caddy TLS + Go tsnet): `https://console.localhost` (UI). Local Tailscale login-server is `http://127.0.0.1:8080`; set `OTTERSCALE_DOMAIN` for production HTTPS.
 
 ### Quick start (local)
 
@@ -36,10 +36,11 @@ Single-tenant control plane: **SQLite** via `DATABASE_URL`, **Auth.js** (local e
 
 4. First user: open `/setup` — email, then username + password (min 8), then TOTP. OIDC/Google buttons appear on step 1 (disabled until the three OIDC vars are set). The first account becomes **Owner** and **super admin**, with default tags `prod`, `uat`, `dev`. Roles are Owner, Super admin, Admin, and Member. Workspaces isolate peers; tags are labels.
 
-5. Join a machine with an official Tailscale client. After **Add device** on `/machines`, run the printed command (`HEADSCALE_PUBLIC_URL`, default `https://hs.localhost`):
+5. Join a machine with an official Tailscale client. After **Add device** on `/machines`, run both printed commands. Login-server is `OTTERSCALE_DOMAIN`, or `http://127.0.0.1:8080` when that env is unset:
 
    ```bash
-   tailscale up --login-server=https://hs.localhost --auth-key=<key>
+   tailscale logout
+   tailscale up --login-server=http://127.0.0.1:8080 --auth-key=<key>
    ```
 
 ### Docker stack (Caddy + Headscale + app + SQLite)
@@ -50,23 +51,15 @@ Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose.
 pnpm deploy:stack
 ```
 
-This script creates or updates `.env` (generates `AUTH_SECRET`, sets SQLite `DATABASE_URL=file:/data/otterscale.db`), builds images, starts Headscale and Caddy, and writes `HEADSCALE_API_KEY` only after Headscale accepts the key. The app container runs **`prisma migrate deploy`** before `node server.js`.
+This script creates or updates `.env` (generates `AUTH_SECRET`, sets SQLite `DATABASE_URL=file:/data/otterscale.db`), builds images, starts Headscale and `edge`, and writes `HEADSCALE_API_KEY` only after Headscale accepts the key. The app container runs **`prisma migrate deploy`** before `node server.js`.
 
-**Network Apps** publish a mesh address on `https://{subdomain}.apps.localhost` (override with `APPS_BASE_DOMAIN`). One `proxy` container (Go `tsnet`) does that work: it joins Headscale as hostname `edge` / `tag:edge`, reverse-proxies on port 80, and answers TCP probes on port 4180. The public `caddy` service terminates TLS and forwards `*.apps.localhost` to `proxy:80`. `headscale/headscale` stays the coordination server. `pnpm deploy:stack` writes `APPS_EDGE_AUTHKEY`, a reusable `tag:edge` pre-auth key, so the proxy can join. Chrome resolves `*.apps.localhost`. The Windows Tailscale client cannot resolve `*.localhost`, so it joins Headscale at `http://127.0.0.1:8080` (published on loopback only). This is a reverse proxy onto the mesh, not Funnel.
+**Network Apps** publish a mesh address on `https://{subdomain}.apps.localhost` (override with `APPS_BASE_DOMAIN`). One **`edge`** container does that work: Caddy terminates TLS, and a Go `tsnet` process (hostname `edge` / `tag:edge`) reverse-proxies onto mesh IPs and answers TCP probes on port 4180. `headscale/headscale` stays the coordination server. `pnpm deploy:stack` writes `APPS_EDGE_AUTHKEY`, a reusable `tag:edge` pre-auth key, so edge can join. Local clients join at `http://127.0.0.1:8080` (Headscale published on the host). Set `OTTERSCALE_DOMAIN` so **Add device** prints that HTTPS origin instead. Chrome resolves `*.apps.localhost`. This is a reverse proxy onto the mesh, not Funnel.
 
-If `*.localhost` does not resolve, add hosts:
+If `*.localhost` does not resolve in the browser, add hosts:
 
 ```text
 127.0.0.1 console.localhost hs.localhost
 ```
-
-Official Tailscale clients require a trusted TLS certificate. After Caddy has started once, export and trust the local CA:
-
-```bash
-docker exec caddy cat /data/caddy/pki/authorities/local/root.crt
-```
-
-On Windows (elevated): save that file as `caddy-root.crt`, then `certutil -addstore -f ROOT caddy-root.crt`.
 
 To rotate the Headscale API key by hand:
 

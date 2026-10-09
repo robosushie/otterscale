@@ -8,9 +8,9 @@ Reference: [design specification PDF](./external/Otterscale_Design_Architecture.
 
 ### Current implementation (Phase 1–2, single tenant)
 
-The shipping control plane is a **Next.js 16** app with **Prisma 6** on SQLite (`DATABASE_URL`). One organisation, one Headscale instance (optional in dev), **workspaces as the isolation unit** (Headscale ACL groups), **tags** as orthogonal ACL labels, policy compiler, audit hash chain, and RBAC (**Owner / Super admin / Admin / Member**). Auth: **Auth.js** with **local credentials + TOTP always on**; generic OIDC enables automatically when issuer, client id, and client secret are all set. The console sidebar is Network (Machines, Apps), Users, Access controls (Workspaces, Policies), Audit (System / Network logs), and Settings (General, User management, Device management, Policy file, Keys). Prisma stores ACL **groups** as workspaces. **Network Apps** are published through one `proxy` container: a Go `tsnet` node (hostname `edge` / `tag:edge`) that reverse-proxies on `:80` and answers TCP probes on `:4180`. Public Caddy forwards `*.apps.localhost` to `proxy:80`. `headscale/headscale` is the coordination server. This is not Tailscale Funnel. Billing, Funnel, Mullvad, and Tailnet Lock are out of Phase 1–2. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
+The shipping control plane is a **Next.js 16** app with **Prisma 6** on SQLite (`DATABASE_URL`). One organisation, one Headscale instance (optional in dev), **workspaces as the isolation unit** (Headscale ACL groups), **tags** as orthogonal ACL labels, policy compiler, audit hash chain, and RBAC (**Owner / Super admin / Admin / Member**). Auth: **Auth.js** with **local credentials + TOTP always on**; generic OIDC enables automatically when issuer, client id, and client secret are all set. The console sidebar is Network (Machines, Apps), Users, Access controls (Workspaces, Policies), Audit (System / Network logs), and Settings (General, User management, Device management, Policy file, Keys). Prisma stores ACL **groups** as workspaces. **Network Apps** are published through one **`edge`** container: Caddy terminates TLS (`console.localhost`, `hs.localhost`, `*.apps.localhost`) and a Go `tsnet` process (hostname `edge` / `tag:edge`) reverse-proxies onto mesh IPs and answers TCP probes on `:4180`. Official Tailscale clients join at `http://127.0.0.1:8080` locally, or at `OTTERSCALE_DOMAIN` when that env is set. `headscale/headscale` is the coordination server. This is not Tailscale Funnel. Billing, Funnel, Mullvad, and Tailnet Lock are out of Phase 1–2. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
 
-Code layout: `app/` (routes), `components/`, `lib/` (`headscale/` adapter only for Headscale HTTP), `cmd/proxy` (Go tsnet Network Apps hop), `internal/appsproxy/`, `prisma/`, `deploy/`.
+Code layout: `app/` (routes), `components/`, `lib/` (`headscale/` adapter only for Headscale HTTP), `cmd/proxy` (Go tsnet Network Apps hop, runs inside `edge`), `internal/appsproxy/`, `prisma/`, `deploy/`.
 
 ---
 
@@ -245,7 +245,7 @@ Full matrix: [security.md](./security.md#authorization-matrix).
 ### Device onboarding (server)
 
 1. Tenant admin creates scoped auth key (env tag, reusable or ephemeral)
-2. `otter up --authkey …` or `tailscale up --login-server … --authkey …`
+2. `otter up --authkey …` or `tailscale logout` then `tailscale up --login-server … --auth-key …`
 3. Tagged node; visible per group rules
 
 ### Access request (Phase 3)
