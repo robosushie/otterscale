@@ -24,7 +24,7 @@ export default async function SettingsPolicyPage() {
     <div>
       <PageHeader
         title="Policy file"
-        description="Otterscale compiles workspace isolation, tags, extra rules, and published-app ACLs into Headscale HuJSON."
+        description="Compiled Headscale HuJSON for this tailnet."
         action={
           <Link href="/policies">
             <Button variant="secondary">Open Policies</Button>

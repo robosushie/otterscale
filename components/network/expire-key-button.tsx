@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Trash2 } from "lucide-react";
 import { expireAuthKey } from "@/lib/actions/network";
 import { Button } from "@/components/ui/button";
 
@@ -9,11 +10,12 @@ export function ExpireKeyButton({ authKey }: { authKey: string }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div>
+    <div className="flex flex-col items-end justify-center">
       <Button
         type="button"
         variant="ghost"
-        className="!min-h-0 text-sm"
+        icon
+        aria-label="Delete key"
         disabled={pending || !authKey}
         onClick={() => {
           if (!confirm("Expire this key? Devices can no longer use it to join.")) return;
@@ -26,7 +28,7 @@ export function ExpireKeyButton({ authKey }: { authKey: string }) {
           });
         }}
       >
-        {pending ? "Expiring…" : "Delete"}
+        <Trash2 className="size-3.5" />
       </Button>
       {error ? <p className="text-sm text-off-black">{error}</p> : null}
     </div>

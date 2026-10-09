@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -6,9 +5,9 @@ import { getDefaultOrganization } from "@/lib/org/singleton";
 import { loadAuthzContext } from "@/lib/authz/load-context";
 import { hasCapability } from "@/lib/authz/permissions";
 import { displayUserRole, accessRoleKey } from "@/lib/console/user-role";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { InvitePanel } from "@/components/auth/invite-panel";
+import { AddPanel } from "@/components/ui/side-panel";
+import { InviteForm, PendingInvitesTable } from "@/components/auth/invite-panel";
 import { UsersTable } from "@/components/users/users-table";
 
 export default async function SettingsUsersPage() {
@@ -38,6 +37,7 @@ export default async function SettingsUsersPage() {
     }),
   ]);
 
+  const workspaceOptions = groups.map((group) => ({ id: group.id, name: group.name }));
   const rows = users.map((u) => ({
     id: u.id,
     name: u.name?.trim() || u.username || u.email,
@@ -57,31 +57,27 @@ export default async function SettingsUsersPage() {
   return (
     <div>
       <PageHeader
-        title="User management"
-        description="Invite people as Super admin, Admin, or Member, and assign workspaces. Owner and super admin are in every workspace automatically."
+        title="Users"
+        description="Invite people and assign workspaces."
         action={
-          <Link href="/users" className="link text-sm">
-            Open Users
-          </Link>
+          <AddPanel buttonLabel="Add user" title="Add user">
+            <InviteForm
+              workspaces={workspaceOptions}
+              canAssignSuperAdmin={hasCapability(authz.capabilities, "platform.manage_admins")}
+            />
+          </AddPanel>
         }
       />
 
-      <Card className="mb-8">
-        <h2 className="text-[24px]">Invite users</h2>
-        <InvitePanel
-          pendingInvites={pendingInvites}
-          workspaces={groups.map((group) => ({ id: group.id, name: group.name }))}
-          canAssignSuperAdmin={hasCapability(authz.capabilities, "platform.manage_admins")}
-        />
-      </Card>
-
       <UsersTable
         users={rows}
-        workspaces={groups.map((group) => ({ id: group.id, name: group.name }))}
+        workspaces={workspaceOptions}
         canManage
         canAssignSuperAdmin={hasCapability(authz.capabilities, "platform.manage_admins")}
         currentUserId={authz.userId}
       />
+
+      <PendingInvitesTable pendingInvites={pendingInvites} />
     </div>
   );
 }

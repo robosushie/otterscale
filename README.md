@@ -1,5 +1,10 @@
 Open-source team mesh control platform on [Headscale](https://github.com/juanfont/headscale), with a role-based console and **official Tailscale clients only** (no custom VPN app).
 
+[![CI Next.js](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml)
+[![CI Go](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml)
+
+**Site:** [robosushie.github.io/otterscale](https://robosushie.github.io/otterscale/) — [features](https://robosushie.github.io/otterscale/features.html), [deploy](https://robosushie.github.io/otterscale/deploy.html). Enable **Settings → Pages → GitHub Actions** once so the Pages workflow can publish.
+
 **Documentation:** [docs/README.md](./docs/README.md) — [roadmap](./docs/roadmap.md), [architecture](./docs/architecture.md), [deployment](./docs/deployment.md), [design theme](./docs/theme.md). Source spec: [docs/external/Otterscale_Design_Architecture.pdf](./docs/external/Otterscale_Design_Architecture.pdf).
 
 ## Console (Next.js + Prisma)
@@ -69,6 +74,23 @@ docker exec headscale /ko-app/headscale apikeys create --expiration 8760h
 
 Put the printed key in `.env` as `HEADSCALE_API_KEY`, then recreate the app container.
 
+### Otterscale Stack (GHCR pull)
+
+For a cloud VM or any Docker Compose host, pull published images instead of building:
+
+```bash
+cp deploy/otterscale-stack.env.example .env
+docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d
+```
+
+Bootstrap waits until Headscale is healthy, then writes `HEADSCALE_API_KEY`, `APPS_EDGE_AUTHKEY`, and `AUTH_SECRET` (if empty) onto a secrets volume. Set `OTTERSCALE_DOMAIN` and `AUTH_URL` in production. Railway/Heroku cannot run this file as one service — see the [deploy page](https://robosushie.github.io/otterscale/deploy.html).
+
+Publish images from **Actions → Publish GHCR**: pick the branch, enter a tag (`0.1.0` or `dev`). Semver tags also move `latest`. Images:
+
+`ghcr.io/robosushie/otterscale/{app,edge,headscale}`
+
+If the workflow cannot mark packages public, open Packages once and set visibility to public.
+
 ### Scripts
 
 | Command | Purpose |
@@ -78,6 +100,7 @@ Put the printed key in `.env` as `HEADSCALE_API_KEY`, then recreate the app cont
 | `pnpm db:migrate` | Apply pending migrations (deploy / fresh DB) |
 | `pnpm deploy:stack` | Build & run Docker stack (Caddy + Headscale + SQLite app) |
 | `pnpm test` | Vitest |
+| `docker compose -f deploy/otterscale-stack.yaml up -d` | Pull GHCR images (Otterscale Stack) |
 
 ### Repo layout
 

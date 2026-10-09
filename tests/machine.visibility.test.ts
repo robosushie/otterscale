@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isEdgeMachine } from "@/lib/machines/edge";
 import { machineVisibleToViewer } from "@/lib/machines/visibility";
 
 describe("machineVisibleToViewer", () => {
@@ -26,5 +27,22 @@ describe("machineVisibleToViewer", () => {
 
   it("hides unassigned machines from members", () => {
     expect(machineVisibleToViewer([], { isPlatformAdmin: false, workspaceIds: ["ws-eng"] })).toBe(false);
+  });
+});
+
+describe("isEdgeMachine", () => {
+  it("hides the edge node by name or hostname", () => {
+    expect(isEdgeMachine({ name: "edge" })).toBe(true);
+    expect(isEdgeMachine({ name: "Edge", hostname: "laptop" })).toBe(true);
+    expect(isEdgeMachine({ name: "robosushie", hostname: "edge" })).toBe(true);
+  });
+
+  it("hides nodes tagged tag:edge", () => {
+    expect(isEdgeMachine({ name: "proxy", tags: ["tag:edge"] })).toBe(true);
+    expect(isEdgeMachine({ name: "proxy", tags: ["tag:prod"] })).toBe(false);
+  });
+
+  it("keeps ordinary machines visible", () => {
+    expect(isEdgeMachine({ name: "robosushie", hostname: "robosushie", tags: ["tag:prod"] })).toBe(false);
   });
 });

@@ -1,0 +1,87 @@
+name: Publish GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag (for example 0.1.0 or dev)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Build and push ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: app
+            file: deploy/Dockerfile
+            context: .
+          - name: edge
+            file: deploy/edge/Dockerfile
+            context: .
+          - name: headscale
+            file: deploy/headscale/Dockerfile
+            context: deploy/headscale
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          TAG="${TAG#v}"
+          SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+          IMAGE="ghcr.io/${{ github.repository }}/${{ matrix.name }}"
+          IMAGE="${IMAGE,,}"
+          TAGS="${IMAGE}:${TAG},${IMAGE}:${TAG}-${SHA}"
+          if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            TAGS="${TAGS},${IMAGE}:latest"
+          fi
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "package=${{ github.event.repository.name }}/${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Make package public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          encoded="$(printf '%s' '${{ steps.meta.outputs.package }}' | jq -sRr @uri)"
+          owner="${{ github.repository_owner }}"
+          if [ "${{ github.event.repository.owner.type }}" = "Organization" ]; then
+            gh api --method POST -H "Accept: application/vnd.github+json" \
+              "/orgs/${owner}/packages/container/${encoded}/visibility" \
+              -f visibility=public
+          else
+            gh api --method POST -H "Accept: application/vnd.github+json" \
+              "/user/packages/container/${encoded}/visibility" \
+              -f visibility=public
+          fi

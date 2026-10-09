@@ -238,11 +238,27 @@ See [security.md](./security.md).
 
 ---
 
+## Otterscale Stack (Compose pull)
+
+Canonical file: [`deploy/otterscale-stack.yaml`](../deploy/otterscale-stack.yaml). It pulls `ghcr.io/robosushie/otterscale/{app,edge,headscale}` and runs a one-shot **bootstrap** after Headscale is healthy (API key, `tag:edge` pre-auth key, `AUTH_SECRET` if unset).
+
+```bash
+cp deploy/otterscale-stack.env.example .env
+docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d
+```
+
+Set `OTTERSCALE_DOMAIN` (and `AUTH_URL`) whenever TLS sits in front of Headscale. Local default login-server remains `http://127.0.0.1:8080`. Platform notes (AWS, Azure, GCP, Akamai, Render, Railway, Heroku) and the downloadable YAML live on the [GitHub Pages deploy page](https://robosushie.github.io/otterscale/deploy.html). Railway and Heroku cannot execute this Compose file as a single service.
+
+Publish images with **Actions → Publish GHCR** (select branch, input tag). Local `pnpm deploy:stack` still builds from source via [`deploy/docker-compose.yml`](../deploy/docker-compose.yml).
+
+---
+
 ## PaaS-specific notes
 
 ### Railway
 
 - TCP proxy; **no inbound UDP** → DERP on external VM
+- Do not run [`otterscale-stack.yaml`](../deploy/otterscale-stack.yaml) as one Railway service (no shared volumes). Map the three GHCR images; mint keys by hand.
 - All-in-one may run multiple tenant processes if **persistent volume** and port range available [verify on trial deploy]
 
 ### AWS

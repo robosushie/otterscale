@@ -94,9 +94,6 @@ export async function createUserInvite(
     afterJson: { email, username, tenantRole, platformRole, workspaceIds, expiresAt: expiresAt.toISOString() },
   });
 
-  revalidatePath("/users");
-  revalidatePath("/settings/users");
-
   return ok({
     code,
     email,
@@ -167,6 +164,7 @@ export async function assignWorkspaceMembership(formData: FormData): Promise<Act
   }
   revalidatePath("/users");
   revalidatePath("/workspaces");
+  revalidatePath("/tags");
   revalidatePath("/settings/users");
   return okVoid();
 }
@@ -180,6 +178,7 @@ function revalidateUsers() {
   revalidatePath("/users");
   revalidatePath("/settings/users");
   revalidatePath("/workspaces");
+  revalidatePath("/tags");
 }
 
 export async function updateUserAccess(formData: FormData): Promise<ActionResult<void>> {
