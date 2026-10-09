@@ -45,6 +45,9 @@ next-env.d.ts
 /cmd/proxy/proxy
 /cmd/proxy/proxy.exe
 
+# Caddy local CA exported by pnpm deploy:stack
+/deploy/caddy-root.crt
+
 # sqlite (local / docker volume copies)
 /prisma/*.db
 /prisma/*.db-journal

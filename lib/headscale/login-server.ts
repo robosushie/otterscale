@@ -1,4 +1,4 @@
-const HEADSCALE_CLIENT_PORT = "8080";
+const LOCAL_LOGIN_SERVER = "http://127.0.0.1:8080";
 
 function originOf(raw: string): string | null {
   try {
@@ -12,31 +12,16 @@ function originOf(raw: string): string | null {
   }
 }
 
-/** Public login-server for official Tailscale clients. */
-export function getLoginServerUrl(
-  authUrl = process.env.AUTH_URL,
-  publicUrl = process.env.HEADSCALE_PUBLIC_URL,
-): string {
-  const advertised = publicUrl?.trim();
-  if (advertised) {
-    const origin = originOf(advertised);
-    if (origin) return origin;
+/** Login-server for official Tailscale clients. Local default skips TLS. */
+export function getLoginServerUrl(domain = process.env.OTTERSCALE_DOMAIN): string {
+  const raw = domain?.trim();
+  if (!raw) return LOCAL_LOGIN_SERVER;
+  if (/^https?:\/\//i.test(raw)) {
+    return originOf(raw) ?? LOCAL_LOGIN_SERVER;
   }
-
-  const raw = authUrl?.trim();
-  if (!raw) return `http://localhost:${HEADSCALE_CLIENT_PORT}`;
-  try {
-    const url = new URL(raw);
-    url.port = HEADSCALE_CLIENT_PORT;
-    url.pathname = "";
-    url.search = "";
-    url.hash = "";
-    return url.origin;
-  } catch {
-    return `http://localhost:${HEADSCALE_CLIENT_PORT}`;
-  }
+  return `https://${raw.replace(/\/+$/, "")}`;
 }
 
 export function tailscaleUpCommand(authKey: string, loginServer = getLoginServerUrl()): string {
-  return `tailscale up --login-server=${loginServer} --auth-key=${authKey}`;
+  return `tailscale logout\ntailscale up --login-server=${loginServer} --auth-key=${authKey}`;
 }

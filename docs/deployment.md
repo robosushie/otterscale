@@ -189,7 +189,7 @@ Tenant-specific config is rendered into Headscale YAML/JSON at provision time (l
 - Timeouts suitable for long-lived connections
 - Do not buffer SSE from platform API on audit/event streams
 - Document tested configs: **Caddy** (recommended in spec sketch), nginx, Traefik
-- **Network Apps:** one `proxy` container (Go `tsnet`) joins local Headscale as hostname `edge` / `tag:edge`, reverse-proxies published apps on port 80, and answers TCP probes on port 4180. Public Caddy terminates TLS for `*.apps.localhost` and forwards to `proxy:80`. `headscale/headscale` is the coordination server, not a mesh peer. Production uses wildcard DNS and certs on `APPS_BASE_DOMAIN`. Windows clients still use `http://127.0.0.1:8080`. This is not Funnel.
+- **Network Apps:** one `edge` container (Caddy TLS + Go `tsnet`) joins local Headscale as hostname `edge` / `tag:edge`, reverse-proxies published apps, and answers TCP probes on port 4180. Public Caddy in that container terminates TLS for `console.localhost`, `hs.localhost`, and `*.apps.localhost`. `headscale/headscale` is the coordination server, not a mesh peer. Production uses wildcard DNS and certs on `APPS_BASE_DOMAIN`. Local clients join Headscale at `http://127.0.0.1:8080`. Set `OTTERSCALE_DOMAIN` so **Add device** prints that HTTPS login-server. This is not Funnel.
 
 Headscale upstream docs discourage containers/reverse proxies without careful testing—run Otterscale’s integration tests against your chosen proxy.
 

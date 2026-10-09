@@ -59,7 +59,7 @@ Indicative staffing: one to three full-time engineers; dates are estimates, not 
 - [x] Device inventory from Headscale API; filter list by workspace membership (Owner/SA see all)
 - [x] Auth keys: workspace + tag multi-select, reusable/ephemeral, expiry
 - [x] Tags UI (prod/uat/dev/custom); workspaces isolate peers; strict isolation = separate instance later
-- [x] Network Apps: Go tsnet `proxy` reverse-proxies `{subdomain}.{APPS_BASE_DOMAIN}` onto node IP:port (not Funnel)
+- [x] Network Apps: `edge` (Caddy + Go tsnet) reverse-proxies `{subdomain}.{APPS_BASE_DOMAIN}` onto node IP:port (not Funnel)
 
 ### Audit
 
