@@ -24,7 +24,7 @@ export function AppsPage() {
         lastError: row.lastError || null,
         machineId: row.machineId,
         machineName: row.machine,
-        addedBy: "—",
+        addedBy: row.addedBy || "—",
       }))),
     ).catch(() => setApps([]));
   };

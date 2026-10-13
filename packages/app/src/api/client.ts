@@ -82,7 +82,7 @@ export const api = {
     request("/api/access-rules", { method: "POST", body: JSON.stringify(body) }),
   policies: () => request<{ id: string; status: string; contentHash: string; hujson: string; createdAt: string }[]>("/api/policies"),
   applyPolicy: () => request<{ hujson: string }>("/api/policies/apply", { method: "POST", body: "{}" }),
-  apps: () => request<{ id: string; machine: string; machineId: string; port: number; subdomain: string; status: string; lastError: string }[]>("/api/apps"),
+  apps: () => request<{ id: string; machine: string; machineId: string; port: number; subdomain: string; status: string; lastError: string; addedBy: string }[]>("/api/apps"),
   publishApp: (body: { machineId: string; port: number; subdomain: string }) =>
     request("/api/apps", { method: "POST", body: JSON.stringify(body) }),
   deleteApp: (id: string) => request(`/api/apps/${id}`, { method: "DELETE" }),

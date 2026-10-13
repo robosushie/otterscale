@@ -70,7 +70,7 @@ export function AppsTable({
             <tr key={app.id} className="border-b border-ash">
               <td>
                 <div className="cell">
-                  <a className="link" href={`https://${app.subdomain}.${baseDomain}`}>
+                  <a className="link" href={`https://${app.subdomain}.${baseDomain}`} target="_blank" rel="noreferrer">
                     {app.subdomain}.{baseDomain}
                   </a>
                 </div>

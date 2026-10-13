@@ -22,6 +22,7 @@ type Row struct {
 	Subdomain string `json:"subdomain"`
 	Status    string `json:"status"`
 	LastError string `json:"lastError"`
+	AddedBy   string `json:"addedBy"`
 }
 
 func List(ctx context.Context, database *db.DB) ([]Row, error) {
@@ -29,7 +30,7 @@ func List(ctx context.Context, database *db.DB) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := database.Query(ctx, `SELECT a."id", a."machineId", m."name", a."port", a."subdomain", a."status", COALESCE(a."lastError",'') FROM "PublishedApp" a JOIN "Machine" m ON m."id"=a."machineId" WHERE a."organizationId"=? ORDER BY a."subdomain" ASC`, organisation.ID)
+	rows, err := database.Query(ctx, `SELECT a."id", a."machineId", m."name", a."port", a."subdomain", a."status", COALESCE(a."lastError",''), COALESCE(u."name",''), COALESCE(u."username",''), COALESCE(u."email",'') FROM "PublishedApp" a JOIN "Machine" m ON m."id"=a."machineId" LEFT JOIN "User" u ON u."id"=a."createdById" WHERE a."organizationId"=? ORDER BY a."subdomain" ASC`, organisation.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,15 +38,30 @@ func List(ctx context.Context, database *db.DB) ([]Row, error) {
 	var out []Row
 	for rows.Next() {
 		var row Row
-		if err := rows.Scan(&row.ID, &row.MachineID, &row.Machine, &row.Port, &row.Subdomain, &row.Status, &row.LastError); err != nil {
+		var name, username, email string
+		if err := rows.Scan(&row.ID, &row.MachineID, &row.Machine, &row.Port, &row.Subdomain, &row.Status, &row.LastError, &name, &username, &email); err != nil {
 			return nil, err
 		}
+		row.AddedBy = addedBy(name, username, email)
 		out = append(out, row)
 	}
 	if out == nil {
 		out = []Row{}
 	}
 	return out, nil
+}
+
+func addedBy(name, username, email string) string {
+	if strings.TrimSpace(name) != "" {
+		return name
+	}
+	if username != "" {
+		return username
+	}
+	if email != "" {
+		return email
+	}
+	return "—"
 }
 
 func Upsert(ctx context.Context, database *db.DB, actorID, appID, machineID, subdomain string, port int, status, lastError string) error {

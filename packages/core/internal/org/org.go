@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
 	"strings"
 	"time"
 
@@ -14,13 +15,23 @@ import (
 )
 
 type Org struct {
-	ID                             string
-	Name                           string
-	Slug                           string
-	SetupComplete                  bool
-	AppsBaseDomain                 string
-	DefaultAuthKeyExpiryHours      int
-	SuperAdminsImplicitTenantAdmin bool
+	ID                             string `json:"id"`
+	Name                           string `json:"name"`
+	Slug                           string `json:"slug"`
+	SetupComplete                  bool   `json:"setupComplete"`
+	AppsBaseDomain                 string `json:"appsBaseDomain"`
+	DefaultAuthKeyExpiryHours      int    `json:"defaultAuthKeyExpiryHours"`
+	SuperAdminsImplicitTenantAdmin bool   `json:"superAdminsImplicitTenantAdmin"`
+}
+
+func appsBaseDomain(stored string) string {
+	if env := strings.TrimSpace(os.Getenv("APPS_BASE_DOMAIN")); env != "" {
+		return env
+	}
+	if stored = strings.TrimSpace(stored); stored != "" {
+		return stored
+	}
+	return "apps.localhost"
 }
 
 func Default(ctx context.Context, database *db.DB) (Org, error) {
@@ -35,12 +46,13 @@ func Default(ctx context.Context, database *db.DB) (Org, error) {
 			return Org{}, err
 		}
 		settingsID := id.New()
+		domain := appsBaseDomain("")
 		if _, err := database.Exec(ctx, `INSERT INTO "OrganizationSettings" ("id","organizationId","setupComplete","superAdminsImplicitTenantAdmin","appsBaseDomain","defaultAuthKeyExpiryHours","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
-			settingsID, organisation.ID, false, true, "apps.localhost", 24, now, now); err != nil {
+			settingsID, organisation.ID, false, true, domain, 24, now, now); err != nil {
 			return Org{}, err
 		}
 		organisation.SetupComplete = false
-		organisation.AppsBaseDomain = "apps.localhost"
+		organisation.AppsBaseDomain = domain
 		organisation.DefaultAuthKeyExpiryHours = 24
 		organisation.SuperAdminsImplicitTenantAdmin = true
 		return organisation, nil
@@ -50,9 +62,7 @@ func Default(ctx context.Context, database *db.DB) (Org, error) {
 	}
 	_ = database.QueryRow(ctx, `SELECT "setupComplete","appsBaseDomain","defaultAuthKeyExpiryHours","superAdminsImplicitTenantAdmin" FROM "OrganizationSettings" WHERE "organizationId"=?`, organisation.ID).
 		Scan(&organisation.SetupComplete, &organisation.AppsBaseDomain, &organisation.DefaultAuthKeyExpiryHours, &organisation.SuperAdminsImplicitTenantAdmin)
-	if organisation.AppsBaseDomain == "" {
-		organisation.AppsBaseDomain = "apps.localhost"
-	}
+	organisation.AppsBaseDomain = appsBaseDomain(organisation.AppsBaseDomain)
 	if organisation.DefaultAuthKeyExpiryHours == 0 {
 		organisation.DefaultAuthKeyExpiryHours = 24
 	}
