@@ -1,8 +1,8 @@
 # Otterscale standalone — one GHCR image (Caddy + Headscale + console + tsnet).
 # Canonical one-container deploy for a VM, Railway, or Render.
 #
-#   cp deploy/otterscale-standalone.env.example .env
-#   docker compose -f deploy/otterscale-standalone.yaml --env-file .env up -d
+#   cp deployment/otterscale-standalone.env.example .env
+#   docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d
 #
 # Bootstrap mints HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY into /data/secrets.
 # Do not set those in .env. Pin AUTH_SECRET. Set OTTERSCALE_DOMAIN and AUTH_URL

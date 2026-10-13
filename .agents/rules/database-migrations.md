@@ -1,30 +1,18 @@
 ---
-description: Prisma migrations — autogenerate only, never hand-edit SQL
-globs: "prisma/**/*"
+description: Goose migrations in packages/core — sqlite and postgres
+globs: "packages/core/migrations/**/*"
 ---
 
-# Database migrations (Prisma)
+# Database migrations
 
-All schema changes go through **Prisma Migrate**. SQLite connection uses `DATABASE_URL` (`file:…`).
+Schema changes are goose SQL under `packages/core/migrations/sqlite` and `packages/core/migrations/postgres`. Core applies the dialect that matches `DATABASE_URL` on startup.
 
 ## Rules
 
-- **Do not** create, edit, or reorder files under `prisma/migrations/` by hand (no manual SQL, no `prisma migrate diff` into the tree).
-- **Do not** use `prisma db push` for shared environments or committed schema—use migrations.
-- Change **`prisma/schema.prisma`**, then create a revision with:
-
-  ```bash
-  pnpm db:make -- descriptive_snake_name
-  ```
-
-- Apply pending migrations in CI/production:
-
-  ```bash
-  pnpm db:migrate
-  ```
-
-- Regenerate client after schema changes: `pnpm db:generate` (also runs on `postinstall`).
+- Add the next numbered `*.sql` in **both** dialect folders. Keep the SQLite shape compatible with an existing Prisma volume (`CREATE TABLE IF NOT EXISTS` for the baseline).
+- Empty `DATABASE_URL` opens `/data/otterscale.db` (`OTTERSCALE_DATA_DIR` overrides the directory). `postgres://` uses the Postgres files. `file:` and `sqlite:` open that file.
+- Do not add a MySQL dialect.
 
 ## Naming
 
-Use short, snake_case migration names (`add_audit_indexes`, `user_invites`). One logical schema change per migration when practical.
+Use short snake_case names (`00002_add_audit_indexes.sql`). One logical schema change per migration when practical.

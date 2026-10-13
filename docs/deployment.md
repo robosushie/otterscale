@@ -240,7 +240,7 @@ See [security.md](./security.md).
 
 ## Otterscale Stack
 
-Local multi-container deploy builds from [`deploy/docker-compose.yml`](../deploy/docker-compose.yml). A one-shot **init** container runs after Headscale is healthy and writes `HEADSCALE_API_KEY` and the `tag:edge` pre-auth key (`APPS_EDGE_AUTHKEY`) onto the secrets volume. Pin `AUTH_SECRET` in `.env`. Do not put the Headscale keys there — Headscale stores only a hash, so they cannot be recovered from SQLite.
+Local multi-container deploy builds from [`deployment/docker-compose.yml`](../deployment/docker-compose.yml). A one-shot **init** container runs after Headscale is healthy and writes `HEADSCALE_API_KEY` and the `tag:edge` pre-auth key (`APPS_EDGE_AUTHKEY`) onto the secrets volume. Pin `AUTH_SECRET` in `.env`. Do not put the Headscale keys there — Headscale stores only a hash, so they cannot be recovered from SQLite.
 
 ```bash
 pnpm deploy:stack
@@ -257,7 +257,7 @@ Publish images with **Actions → Publish GHCR** (select branch, input tag).
 
 ## Otterscale standalone (one container)
 
-Canonical image: `ghcr.io/robosushie/otterscale/standalone`. Dockerfile: [`deploy/standalone/Dockerfile`](../deploy/standalone/Dockerfile). Headscale, the Next.js console, Caddy, and the tsnet proxy share one process tree and one volume at `/data`.
+Canonical image: `ghcr.io/robosushie/otterscale/standalone`. Dockerfile: [`deployment/standalone/Dockerfile`](../deployment/standalone/Dockerfile). Headscale, the Go API, the static console, and the tsnet proxy share one process tree and one volume at `/data`.
 
 Local build (wipes the standalone volume; `--keep-data` reuses `/data/secrets` and SQLite):
 
@@ -269,8 +269,8 @@ pnpm deploy:standalone --keep-data
 Pull on a VM (`down -v` for a fresh disk; omit `-v` to keep it):
 
 ```bash
-cp deploy/otterscale-standalone.env.example .env
-docker compose -f deploy/otterscale-standalone.yaml --env-file .env up -d
+cp deployment/otterscale-standalone.env.example .env
+docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d
 ```
 
 Caddy listens on 80/443 with internal TLS when `PORT` is unset. Railway and Render set `PORT`; Caddy then serves HTTP on that port and the platform terminates TLS. Headscale listens on `0.0.0.0:18080` so a published host port can reach it without taking `PORT`. In-container clients use `http://127.0.0.1:18080`. Local login-server remains `http://127.0.0.1:8080` (host `127.0.0.1:8080` → container `18080`).
@@ -283,7 +283,7 @@ Set `AUTH_URL`, `OTTERSCALE_DOMAIN`, `CONSOLE_HOST`, and `HS_HOST` to the public
 
 ### Railway / Render
 
-- Prefer the **standalone** image (`deploy/standalone/Dockerfile` or `ghcr.io/robosushie/otterscale/standalone`) as one service with a persistent disk on `/data` (keys live in `/data/secrets`)
+- Prefer the **standalone** image (`deployment/standalone/Dockerfile` or `ghcr.io/robosushie/otterscale/standalone`) as one service with a persistent disk on `/data` (keys live in `/data/secrets`)
 - Set `AUTH_SECRET`, `AUTH_URL`, `OTTERSCALE_DOMAIN`, `CONSOLE_HOST`, and `HS_HOST`; the platform sets `PORT`. Leave Headscale API keys unset
 - TCP proxy; **no inbound UDP** → DERP on an external VM
 - Do not run the multi-container Compose file as one Railway service (no shared volumes). Use `pnpm deploy:stack` on a VM.

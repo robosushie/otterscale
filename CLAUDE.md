@@ -1,6 +1,6 @@
 # Claude Code — Otterscale
 
-Follow repository [`AGENTS.md`](./AGENTS.md) for shared policy, Next.js (read `node_modules/next/dist/docs/`), TypeScript ([`.agents/rules/typescript-standards.md`](./.agents/rules/typescript-standards.md)), and SOLID ([`.agents/rules/solid-principles.md`](./.agents/rules/solid-principles.md)).
+Follow repository [`AGENTS.md`](./AGENTS.md) for shared policy, the Vite console, the Go core, TypeScript ([`.agents/rules/typescript-standards.md`](./.agents/rules/typescript-standards.md)), and SOLID ([`.agents/rules/solid-principles.md`](./.agents/rules/solid-principles.md)).
 
 ## Design system
 
@@ -46,4 +46,4 @@ Only commit when the user asks. Format: `<type>(scope): imperative summary` — 
 
 ## Database migrations
 
-Never edit `prisma/migrations/` manually. Change `schema.prisma`, then `pnpm db:make -- <name>`. Deploy: `pnpm db:migrate`. See [`.agents/rules/database-migrations.md`](./.agents/rules/database-migrations.md).
+Schema changes are goose SQL under `packages/core/migrations`. Core applies them on startup. See [`.agents/rules/database-migrations.md`](./.agents/rules/database-migrations.md).

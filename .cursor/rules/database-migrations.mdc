@@ -1,6 +1,6 @@
 ---
-description: Prisma migrations — use pnpm db:make only, never hand-edit SQL
-globs: prisma/**/*
+description: Goose migrations in packages/core for sqlite and postgres
+globs: packages/core/migrations/**/*
 alwaysApply: false
 ---
 
@@ -8,7 +8,6 @@ alwaysApply: false
 
 Full reference: [`.agents/rules/database-migrations.md`](../../.agents/rules/database-migrations.md).
 
-- **Never** manually edit or add files under `prisma/migrations/`.
-- Update `prisma/schema.prisma`, then run **`pnpm db:make -- <name>`** (autogenerate revision).
-- Deploy applied migrations: **`pnpm db:migrate`** (`prisma migrate deploy`).
-- No `prisma db push` for committed schema.
+- Add the next numbered SQL file in both `packages/core/migrations/sqlite` and `packages/core/migrations/postgres`.
+- Core applies the dialect that matches `DATABASE_URL` on startup.
+- Empty `DATABASE_URL` creates `/data/otterscale.db`. `postgres://` uses Postgres. `file:` and `sqlite:` open that file.
