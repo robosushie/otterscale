@@ -20,9 +20,9 @@ import { prisma } from "@/lib/db";
 import { workspaceTagName } from "@/lib/console/user-role";
 import { compileAndApply } from "@/lib/services/policy-apply";
 import { fail, ok, okVoid, type ActionResult } from "@/lib/actions/result";
+import { buildMachinesTable, type MachinesTableData } from "@/lib/machines/list";
 
 function revalidateMachines() {
-  revalidatePath("/machines");
   revalidatePath("/apps");
   revalidatePath("/audit/network");
   revalidatePath("/settings/keys");
@@ -203,4 +203,11 @@ export async function deleteMachine(formData: FormData): Promise<ActionResult<vo
   await applyPolicyQuiet(session.user.id);
   revalidateMachines();
   return okVoid();
+}
+
+/** Re-read Headscale and return table rows. Does not re-render the page. */
+export async function refreshMachinesTable(): Promise<MachinesTableData> {
+  const session = await requireSession();
+  const authz = await requireCapability(session.user.id, "network.view");
+  return buildMachinesTable(authz);
 }

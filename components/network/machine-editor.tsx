@@ -3,34 +3,26 @@
 import { useCallback, useState, useTransition, type FormEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { deleteMachine, updateMachine } from "@/lib/actions/network";
+import type { MachineRow } from "@/lib/machines/rows";
 import { Button } from "@/components/ui/button";
 import { CheckMenu } from "@/components/ui/check-menu";
 import { Field, Input } from "@/components/ui/field";
 import { SidePanel } from "@/components/ui/side-panel";
 
-export type MachineRow = {
-  machineId: string;
-  name: string;
-  addresses: string;
-  lastSeen: string;
-  online: boolean;
-  workspaceNames: string[];
-  tagNames: string[];
-  selectedWorkspaceIds: string[];
-  selectedTagIds: string[];
-  addedBy: string;
-};
+export type { MachineRow } from "@/lib/machines/rows";
 
 export function MachinesTable({
   rows,
   workspaces,
   tags,
   canManage,
+  onMutated,
 }: {
   rows: MachineRow[];
   workspaces: { id: string; name: string }[];
   tags: { id: string; name: string; aclTag: string }[];
   canManage: boolean;
+  onMutated?: () => void;
 }) {
   const [editing, setEditing] = useState<MachineRow | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +43,7 @@ export function MachinesTable({
         return;
       }
       close();
+      onMutated?.();
     });
   }
 
@@ -61,7 +54,11 @@ export function MachinesTable({
     startTransition(async () => {
       setError(null);
       const result = await deleteMachine(fd);
-      if (!result.ok) setError(result.error);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onMutated?.();
     });
   }
 

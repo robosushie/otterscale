@@ -5,14 +5,21 @@ SECRETS="${OTTERSCALE_SECRETS_DIR:-/otterscale-secrets}"
 
 load_secret() {
   name=$1
-  eval "current=\${$name:-}"
-  if [ -n "$current" ]; then
-    return
-  fi
   if [ -s "${SECRETS}/${name}" ]; then
-    value=$(cat "${SECRETS}/${name}")
+    value=$(tr -d '\r\n' < "${SECRETS}/${name}")
     export "$name=$value"
   fi
+}
+
+reset_edge_state_if_needed() {
+  flag="${SECRETS}/EDGE_STATE_RESET"
+  [ -f "$flag" ] || return 0
+  dir="${TS_STATE_DIR:-/var/lib/tailscale}"
+  echo "Resetting tsnet state at ${dir}"
+  if [ -d "$dir" ]; then
+    find "$dir" -mindepth 1 -depth -delete
+  fi
+  rm -f "$flag"
 }
 
 if [ -d "$SECRETS" ]; then
@@ -26,6 +33,7 @@ if [ -d "$SECRETS" ]; then
     sleep 2
   done
   load_secret APPS_EDGE_AUTHKEY
+  reset_edge_state_if_needed
 fi
 
 /usr/local/bin/proxy &

@@ -1,9 +1,9 @@
-import { auth } from "@/lib/auth";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { getAuthMethodsPublic } from "@/lib/auth/methods";
 import { hasOwner } from "@/lib/auth/owner";
+import { liveSession } from "@/lib/auth/live-session";
 import { getServerEnv } from "@/lib/env";
 import { BrandMark } from "@/components/brand/lockup";
 import { LocalAccountForm } from "@/components/auth/local-account-form";
@@ -13,9 +13,10 @@ export const instant = false;
 
 export default async function SetupPage() {
   await connection();
-  const session = await auth();
-  if (session?.user) redirect("/machines");
-  if (await hasOwner()) redirect("/signin");
+  if (await hasOwner()) {
+    if (await liveSession()) redirect("/machines");
+    redirect("/signin");
+  }
 
   const methods = getAuthMethodsPublic();
   const env = getServerEnv();

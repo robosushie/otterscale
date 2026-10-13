@@ -1,8 +1,8 @@
-import { auth } from "@/lib/auth";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { getAuthMethodsPublic } from "@/lib/auth/methods";
+import { liveSession } from "@/lib/auth/live-session";
 import { hasOwner } from "@/lib/auth/owner";
 import { BrandMark } from "@/components/brand/lockup";
 import { SignInForm } from "@/components/auth/sign-in-form";
@@ -15,13 +15,11 @@ type Props = {
 
 export default async function SignInPage({ searchParams }: Props) {
   await connection();
-  const session = await auth();
-  if (session?.user) redirect("/machines");
+  const session = await liveSession();
+  if (session) redirect("/machines");
+  if (!(await hasOwner())) redirect("/setup");
 
   const methods = getAuthMethodsPublic();
-  if (!(await hasOwner())) {
-    redirect("/setup");
-  }
 
   const params = await searchParams;
   const notice =

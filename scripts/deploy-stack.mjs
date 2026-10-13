@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * One-command stack deploy: edge (Caddy + tsnet) + Headscale + Otterscale app (SQLite).
- * - Ensures .env (AUTH_SECRET, SQLite DATABASE_URL, public Headscale URL)
- * - Builds images and starts Compose
- * - Bootstraps Headscale user + API key into .env when HEADSCALE_API_KEY is empty
- * - App container runs `prisma migrate deploy` on start (see deploy/docker-entrypoint.sh)
+ * Multi-container stack (project otterscale).
+ * Default: delete this project's volumes, then start Headscale → init → app + edge.
+ * --keep-data: reuse volumes. Bootstrap reuses secrets on the volume.
+ * --no-build: skip image build.
+ *
+ * HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY are minted into the secrets volume.
+ * They are not written to .env. AUTH_SECRET stays in .env.
  */
 
 import { spawnSync } from "node:child_process";
@@ -17,28 +19,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const envPath = path.join(repoRoot, ".env");
 const envExamplePath = path.join(repoRoot, ".env.example");
-
-function composeArgs() {
-  return [
-    "-p",
-    "otterscale",
-    "-f",
-    path.join(repoRoot, "deploy/docker-compose.yml"),
-    "--env-file",
-    envPath,
-  ];
-}
+const composeFile = path.join(repoRoot, "deploy/docker-compose.yml");
+const otherComposeFile = path.join(repoRoot, "deploy/docker-compose.standalone.yml");
 
 const STACK_DATABASE_URL = "file:/data/otterscale.db";
-const HEADSCALE_DEFAULT_USER = "tagged-devices";
+const LOCAL_LOGIN_SERVER = "http://127.0.0.1:8080";
+const HEADSCALE_ENV_KEYS = ["HEADSCALE_API_KEY", "APPS_EDGE_AUTHKEY"];
+
+function composeArgs() {
+  return ["-p", "otterscale", "-f", composeFile, "--env-file", envPath];
+}
 
 function run(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, {
     cwd: repoRoot,
     stdio: opts.quiet ? "pipe" : "inherit",
     encoding: "utf8",
-    // Windows needs a shell for `docker compose`; probes pass argv arrays with
-    // colons/spaces and must use shell:false so cmd.exe does not rewrite them.
     shell: opts.shell ?? process.platform === "win32",
     env: { ...process.env, ...opts.env },
     windowsHide: true,
@@ -50,10 +46,6 @@ function run(cmd, args, opts = {}) {
     );
   }
   return res.stdout ?? "";
-}
-
-function compose(args, opts = {}) {
-  return run("docker", ["compose", ...composeArgs(), ...args], opts);
 }
 
 function parseEnvFile(content) {
@@ -106,6 +98,26 @@ function serializeEnvFile(original, updates) {
   return out.join("\n").replace(/\n?$/, "\n");
 }
 
+function stripHeadscaleKeys(content) {
+  let removed = false;
+  const lines = content.split(/\r?\n/).filter((line) => {
+    const eq = line.indexOf("=");
+    if (eq === -1) return true;
+    const key = line.slice(0, eq).trim();
+    if (HEADSCALE_ENV_KEYS.includes(key)) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
+  if (removed) {
+    console.log(
+      "Removed HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY from .env (secrets volume owns them)",
+    );
+  }
+  return lines.join("\n").replace(/\n?$/, "\n");
+}
+
 function loadEnv() {
   if (!fs.existsSync(envPath)) {
     if (fs.existsSync(envExamplePath)) {
@@ -145,11 +157,6 @@ function ensureEnvDefaults(content) {
     updates.set("HEADSCALE_PUBLIC_URL", "https://hs.localhost");
   }
 
-  const internal = map.get("HEADSCALE_INTERNAL_URL")?.trim() ?? "";
-  if (!internal || /localhost|127\.0\.0\.1/.test(internal)) {
-    updates.set("HEADSCALE_INTERNAL_URL", "http://headscale:8080");
-  }
-
   if (updates.size === 0) return content;
   return serializeEnvFile(content, updates);
 }
@@ -157,8 +164,6 @@ function ensureEnvDefaults(content) {
 function getEnvValue(content, key) {
   return parseEnvFile(content).get(key)?.trim() ?? "";
 }
-
-const LOCAL_LOGIN_SERVER = "http://127.0.0.1:8080";
 
 function loginServerUrl(domain) {
   const raw = (domain ?? "").trim();
@@ -173,346 +178,60 @@ function loginServerUrl(domain) {
   return `https://${raw.replace(/\/+$/, "")}`;
 }
 
-function setEnvValue(content, key, value) {
-  return serializeEnvFile(content, new Map([[key, value]]));
+function composeEnvFrom(content) {
+  const map = parseEnvFile(content);
+  const env = { ...process.env, ...Object.fromEntries(map) };
+  delete env.PORT;
+  for (const key of HEADSCALE_ENV_KEYS) delete env[key];
+  return env;
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForHeadscale(maxAttempts = 60) {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      headscaleExec(["users", "list", "--output", "json"]);
-      return;
-    } catch {
-      /* not ready */
-    }
-    await delay(2000);
-  }
-  throw new Error("Headscale did not become ready (CLI could not reach the server)");
-}
-
-function headscaleExec(args, opts = {}) {
-  // `docker compose exec` does not apply the image ENTRYPOINT; invoke the binary explicitly.
-  return compose(["exec", "-T", "headscale", "/ko-app/headscale", ...args], {
-    quiet: true,
-    ...opts,
-  }).trim();
-}
-
-function ensureHeadscaleUser() {
-  let users = [];
-  try {
-    const raw = headscaleExec(["users", "list", "--output", "json"]);
-    const parsed = raw ? JSON.parse(raw) : [];
-    users = Array.isArray(parsed) ? parsed : (parsed?.users ?? []);
-  } catch {
-    users = [];
-  }
-
-  const names = new Set(
-    users.map((u) => u.name ?? u.username ?? u.Name).filter(Boolean),
-  );
-  if (names.has(HEADSCALE_DEFAULT_USER)) return;
-
-  console.log(`Creating Headscale user "${HEADSCALE_DEFAULT_USER}"...`);
-  headscaleExec(["users", "create", HEADSCALE_DEFAULT_USER]);
-}
-
-/**
- * Same call the console uses (GET /api/v1/node), from the Docker network.
- * Headscale 0.23 rejects an unknown key with HTTP 500 + "Unauthorized".
- * The Bearer token is passed in env so Windows cmd.exe cannot split the header.
- */
-function probeHeadscaleApiKey(apiKey) {
-  const script =
-    'fetch("http://headscale:8080/api/v1/node",{headers:{Authorization:"Bearer "+process.env.PROBE_KEY}}).then(async(r)=>{const t=await r.text();process.stdout.write(JSON.stringify({ok:r.ok,status:r.status,body:t.slice(0,200)}));}).catch((e)=>{process.stdout.write(JSON.stringify({ok:false,status:0,body:String(e.message||e)}));})';
+function stopOther(env) {
   const res = spawnSync(
     "docker",
-    [
-      "compose",
-      ...composeArgs(),
-      "run",
-      "--rm",
-      "--no-deps",
-      "-T",
-      "-e",
-      `PROBE_KEY=${apiKey}`,
-      "--entrypoint",
-      "node",
-      "app",
-      "-e",
-      script,
-    ],
+    ["compose", "-p", "otterscale-standalone", "-f", otherComposeFile, "stop"],
     {
       cwd: repoRoot,
-      encoding: "utf8",
-      shell: false,
-      windowsHide: true,
-      env: process.env,
-    },
-  );
-  const raw = `${res.stdout ?? ""}\n${res.stderr ?? ""}`.trim();
-  const parsed = parseProbePayload(raw);
-  if (!parsed) {
-    const detail =
-      raw.slice(0, 200) || `probe exit ${res.status} (${res.error?.message ?? "no output"})`;
-    throw new Error(`Headscale API key probe failed: ${detail}`);
-  }
-  return {
-    ok: Boolean(parsed.ok),
-    status: Number(parsed.status) || 0,
-    body: String(parsed.body ?? ""),
-  };
-}
-
-function describeProbe(probe) {
-  const detail = probe.body?.trim().replace(/\s+/g, " ").slice(0, 120);
-  return detail ? `${probe.status}: ${detail}` : String(probe.status);
-}
-
-/** Docker Compose may wrap the one-line JSON probe with logs. */
-function parseProbePayload(text) {
-  const start = text.indexOf('{"ok":');
-  if (start < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (escape) escape = false;
-      else if (ch === "\\") escape = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') inString = true;
-    else if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(text.slice(start, i + 1));
-        } catch {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function removeLegacyHop() {
-  console.log("Removing leftover caddy/proxy/probe containers if present...");
-  spawnSync(
-    "docker",
-    ["rm", "-f", "caddy", "proxy", "edge", "probe", "apps-edge", "apps-probe", "apps-caddy"],
-    {
-      cwd: repoRoot,
-      encoding: "utf8",
       stdio: "pipe",
+      encoding: "utf8",
       shell: process.platform === "win32",
       windowsHide: true,
+      env,
     },
   );
-  spawnSync("docker", ["volume", "rm", "otterscale_apps_edge_state"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: "pipe",
-    shell: process.platform === "win32",
-    windowsHide: true,
-  });
-}
-
-function parsePreAuthKeyList(raw) {
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
-    return parsed.preAuthKeys ?? parsed.preauthkeys ?? parsed.keys ?? [];
-  } catch {
-    return [];
+  if (res.status === 0) {
+    console.log("Stopped standalone (its volumes were kept).");
   }
 }
 
-function edgeAuthKeyIsValid(key) {
-  if (!key) return false;
-  let raw = "";
-  try {
-    raw = headscaleExec([
-      "preauthkeys",
-      "list",
-      "--user",
-      HEADSCALE_DEFAULT_USER,
-      "--output",
-      "json",
-    ]);
-  } catch {
-    return true;
-  }
-  const rows = parsePreAuthKeyList(raw);
-  if (!Array.isArray(rows) || rows.length === 0) return false;
-  const now = Date.now();
-  return rows.some((row) => {
-    const stored = String(row.key ?? row.Key ?? "").trim();
-    if (!stored) return false;
-    const same = stored === key || key.startsWith(stored) || stored.startsWith(key);
-    if (!same) return false;
-    if (row.expired === true) return false;
-    const exp = row.expiration ?? row.Expiration;
-    if (exp) {
-      const t = Date.parse(exp);
-      if (!Number.isNaN(t) && t < now) return false;
-    }
-    return true;
-  });
-}
-
-function createEdgeAuthKey() {
-  console.log("Creating reusable Headscale pre-auth key for tag:edge...");
-  const raw = headscaleExec([
-    "preauthkeys",
-    "create",
-    "--user",
-    HEADSCALE_DEFAULT_USER,
-    "--reusable",
-    "--expiration",
-    "8760h",
-    "--tags",
-    "tag:edge",
-    "--output",
-    "json",
-  ]);
-  let key = raw;
-  try {
-    const parsed = JSON.parse(raw);
-    const row = parsed.preAuthKey ?? parsed.preauthkey ?? parsed;
-    key = typeof row === "string" ? row : (row.key ?? parsed.key ?? "");
-  } catch {
-    const match = raw.match(/\b[\w-]{20,}\b/);
-    if (match) key = match[0];
-  }
-  key = String(key).trim().replace(/^"|"$/g, "");
-  if (key.length < 16) {
-    throw new Error("Headscale did not return an edge pre-auth key");
-  }
-  return key;
-}
-
-function createHeadscaleApiKey() {
-  console.log("Creating Headscale API key...");
-  const raw = headscaleExec([
-    "apikeys",
-    "create",
-    "--expiration",
-    "8760h",
-    "--output",
-    "json",
-  ]);
-  let key = raw;
-  try {
-    const parsed = JSON.parse(raw);
-    key =
-      typeof parsed === "string"
-        ? parsed
-        : (parsed.apiKey ??
-          parsed.api_key ??
-          parsed.key ??
-          parsed.id ??
-          "");
-  } catch {
-    const match = raw.match(/hskey-[a-zA-Z0-9_-]+/);
-    if (match) key = match[0];
-  }
-  key = String(key).trim().replace(/^"|"$/g, "");
-  if (key.length < 16) {
-    throw new Error(`Unexpected Headscale API key response: ${raw.slice(0, 200)}`);
-  }
-  return key;
-}
-
-async function main() {
+function main() {
+  const keepData = process.argv.includes("--keep-data");
   const noBuild = process.argv.includes("--no-build");
 
-  let envContent = loadEnv();
-  envContent = ensureEnvDefaults(envContent);
+  let envContent = stripHeadscaleKeys(ensureEnvDefaults(loadEnv()));
   fs.writeFileSync(envPath, envContent, "utf8");
 
-  const composeEnv = {
-    ...process.env,
-    ...Object.fromEntries(parseEnvFile(envContent)),
-  };
+  const composeEnv = composeEnvFrom(envContent);
+  stopOther(composeEnv);
+
+  if (!keepData) {
+    console.log("Removing stack containers and volumes...");
+    run("docker", ["compose", ...composeArgs(), "down", "-v", "--remove-orphans"], {
+      env: composeEnv,
+    });
+  } else {
+    console.log("Keeping stack volumes (--keep-data).");
+  }
 
   if (!noBuild) {
     console.log("Building Docker images...");
     run("docker", ["compose", ...composeArgs(), "build"], { env: composeEnv });
   }
 
-  removeLegacyHop();
-
-  console.log("Starting Headscale...");
-  run("docker", ["compose", ...composeArgs(), "up", "-d", "--remove-orphans", "headscale"], {
-    env: composeEnv,
-  });
-
-  console.log("Waiting for Headscale...");
-  await waitForHeadscale();
-
-  ensureHeadscaleUser();
-
-  envContent = fs.readFileSync(envPath, "utf8");
-  let apiKey = getEnvValue(envContent, "HEADSCALE_API_KEY");
-  const existing = apiKey ? probeHeadscaleApiKey(apiKey) : null;
-  if (existing?.ok) {
-    console.log("HEADSCALE_API_KEY is accepted by Headscale");
-  } else {
-    if (existing) {
-      console.log(`HEADSCALE_API_KEY rejected (${describeProbe(existing)}); creating a new key`);
-    } else {
-      console.log("HEADSCALE_API_KEY is empty; creating a new key");
-    }
-    apiKey = createHeadscaleApiKey();
-    const created = probeHeadscaleApiKey(apiKey);
-    if (!created.ok) {
-      throw new Error(
-        `Newly created HEADSCALE_API_KEY was rejected by Headscale (${describeProbe(created)})`,
-      );
-    }
-    envContent = setEnvValue(envContent, "HEADSCALE_API_KEY", apiKey);
-    fs.writeFileSync(envPath, envContent, "utf8");
-    console.log("Wrote HEADSCALE_API_KEY to .env");
-  }
-
-  envContent = fs.readFileSync(envPath, "utf8");
-  let edgeKey = getEnvValue(envContent, "APPS_EDGE_AUTHKEY");
-  if (!edgeKey || !edgeAuthKeyIsValid(edgeKey)) {
-    if (edgeKey) {
-      console.log("APPS_EDGE_AUTHKEY is missing or expired in Headscale; creating a new key");
-    }
-    edgeKey = createEdgeAuthKey();
-    envContent = setEnvValue(envContent, "APPS_EDGE_AUTHKEY", edgeKey);
-    fs.writeFileSync(envPath, envContent, "utf8");
-    console.log("Wrote APPS_EDGE_AUTHKEY to .env");
-  }
-
-  console.log("Starting Otterscale app and edge (migrations run on container start)...");
-  run(
-    "docker",
-    [
-      "compose",
-      ...composeArgs(),
-      "up",
-      "-d",
-      "--remove-orphans",
-      "app",
-      "edge",
-      "--force-recreate",
-    ],
-    {
-      env: { ...composeEnv, HEADSCALE_API_KEY: apiKey, APPS_EDGE_AUTHKEY: edgeKey },
-    },
-  );
+  const up = ["compose", ...composeArgs(), "up", "-d", "--remove-orphans"];
+  if (keepData) up.push("--force-recreate");
+  console.log("Starting Headscale, init, app, and edge...");
+  run("docker", up, { env: composeEnv });
 
   const loginServer = loginServerUrl(getEnvValue(envContent, "OTTERSCALE_DOMAIN"));
 
@@ -521,12 +240,15 @@ async function main() {
   console.log(`  Headscale: ${loginServer}  (Tailscale login-server)`);
   console.log("  Apps:      https://{subdomain}.apps.localhost");
   console.log("  SQLite:    /data/otterscale.db in the app volume");
+  console.log("  Keys:      otterscale_secrets volume (not .env)");
   console.log("\nJoin a device from Machines:");
   console.log("  tailscale logout");
   console.log(`  tailscale up --login-server=${loginServer} --auth-key=<from Machines UI>`);
 }
 
-main().catch((err) => {
+try {
+  main();
+} catch (err) {
   console.error(err.message ?? err);
   process.exit(1);
-});
+}

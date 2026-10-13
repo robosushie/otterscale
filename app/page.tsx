@@ -1,10 +1,13 @@
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { liveSession, redirectSignedOut } from "@/lib/auth/live-session";
+import { hasOwner } from "@/lib/auth/owner";
 
 export const instant = false;
 
 export default async function HomePage() {
-  const session = await auth();
-  if (session?.user) redirect("/machines");
-  redirect("/signin");
+  await connection();
+  const session = await liveSession();
+  if (session) redirect("/machines");
+  redirectSignedOut(await hasOwner());
 }

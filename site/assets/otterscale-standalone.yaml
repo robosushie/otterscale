@@ -1,0 +1,57 @@
+# Otterscale standalone — one GHCR image (Caddy + Headscale + console + tsnet).
+# Canonical one-container deploy for a VM, Railway, or Render.
+#
+#   cp deploy/otterscale-standalone.env.example .env
+#   docker compose -f deploy/otterscale-standalone.yaml --env-file .env up -d
+#
+# Bootstrap mints HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY into /data/secrets.
+# Do not set those in .env. Pin AUTH_SECRET. Set OTTERSCALE_DOMAIN and AUTH_URL
+# in production. Loopback Headscale URL is hardcoded below.
+# Fresh volume: docker compose down -v && docker compose up -d
+# Keep data: docker compose up -d (no down -v)
+
+name: otterscale-standalone
+
+services:
+  standalone:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/standalone:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: otterscale-standalone
+    hostname: otterscale
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:18080"
+    environment:
+      HOSTNAME: "127.0.0.1"
+      DATABASE_URL: file:/data/otterscale.db
+      AUTH_URL: ${AUTH_URL:-https://console.localhost}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_OIDC_ISSUER: ${AUTH_OIDC_ISSUER:-}
+      AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-}
+      AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-}
+      AUTH_SETUP_TOKEN: ${AUTH_SETUP_TOKEN:-}
+      HEADSCALE_INTERNAL_URL: http://127.0.0.1:18080
+      HEADSCALE_PUBLIC_URL: ${HEADSCALE_PUBLIC_URL:-https://hs.localhost}
+      OTTERSCALE_DOMAIN: ${OTTERSCALE_DOMAIN:-}
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      APPS_PROBE_URL: http://127.0.0.1:4180
+      TS_STATE_DIR: /data/tailscale
+      TS_HOSTNAME: edge
+      LISTEN_ADDR: 127.0.0.1:8081
+      PROBE_ADDR: :4180
+      CONSOLE_HOST: ${CONSOLE_HOST:-console.localhost}
+      HS_HOST: ${HS_HOST:-hs.localhost}
+      OTTERSCALE_SECRETS_DIR: /data/secrets
+    volumes:
+      - otterscale_standalone_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4180/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 40s
+
+volumes:
+  otterscale_standalone_data:

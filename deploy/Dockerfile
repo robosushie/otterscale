@@ -26,7 +26,9 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 
 COPY deploy/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Build context may contain CR from any host editor. The kernel treats
+# "#!/bin/sh\r" as a missing interpreter.
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 EXPOSE 3000
 ENTRYPOINT ["/docker-entrypoint.sh"]
