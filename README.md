@@ -34,14 +34,7 @@ Self-hosted team mesh control. No per-seat lock-in. A console on [Headscale](htt
 
 The browser talks to the Otterscale console. Official Tailscale clients talk to Headscale (the coordinator). Edge (Caddy TLS + Go tsnet) publishes Network Apps onto mesh IPs.
 
-```mermaid
-flowchart LR
-  Browser[Browser] --> Console[Otterscale console]
-  Console --> Headscale[Headscale]
-  Clients[Official Tailscale clients] --> Headscale
-  Console --> Edge[Edge]
-  Edge --> Apps[Network Apps on 100.x]
-```
+![Browser talks to the Otterscale console, which reaches Edge and Headscale. Official Tailscale clients talk to Headscale. Edge publishes Network Apps.](./docs/how-it-works.png)
 
 Roles are Owner, Super admin, Admin, and Member. Workspaces isolate peers. Tags are labels (`prod`, `uat`, `dev`). Local login and TOTP are always on; OIDC buttons appear when issuer, client id, and client secret are set.
 
