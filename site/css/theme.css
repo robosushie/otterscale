@@ -337,6 +337,20 @@ details.platform summary {
   font-size: 24px;
 }
 
+details.platform summary > .material-symbols-outlined:first-child {
+  flex: 0 0 auto;
+}
+
+.accordion-chevron {
+  margin-left: auto;
+  flex: 0 0 auto;
+  transition: transform 0.2s ease;
+}
+
+details[open] > summary .accordion-chevron {
+  transform: rotate(180deg);
+}
+
 .steps {
   margin: 0;
   padding: 0 0 0 1.25rem;
@@ -365,15 +379,48 @@ details.platform summary {
 .file-row code {
   font-size: 13px;
   margin-right: auto;
+  overflow-wrap: anywhere;
+}
+
+.file-actions {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--color-off-black);
+  background: transparent;
+  color: var(--color-off-black);
+  text-decoration: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  background: var(--color-parchment);
+  outline: none;
+}
+
+.icon-btn .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .pull-list {
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.pull-list li {
+.pull-list li + li {
   margin-top: 8px;
 }
 
@@ -381,52 +428,87 @@ details.platform summary {
   font-size: 13px;
 }
 
-.release-current {
-  background: var(--color-periwinkle-mist);
-  border: 1px solid var(--color-off-black);
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.release-current h3 {
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 400;
-  margin-top: 8px;
-}
-
-.image-path {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.release-older {
-  margin-top: 16px;
+.release-panel {
   border: 1px solid var(--color-ash);
   border-radius: 8px;
   background: var(--color-paper);
   padding: 0 20px;
 }
 
-.release-older > summary,
-.release-older details summary {
-  cursor: pointer;
-  padding: 16px 0;
+.release-panel + .release-panel {
+  margin-top: 12px;
 }
 
-.release-older > summary {
+.release-panel summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.release-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.release-summary-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.release-tag {
   font-family: var(--font-display);
   font-size: 24px;
+  font-weight: 400;
+  line-height: 1.2;
 }
 
-.release-older details {
-  border-top: 1px solid var(--color-ash);
+.release-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-bottom: 16px;
 }
 
-.release-older details ul {
-  margin-bottom: 16px;
+.release-col {
+  border: 1px solid var(--color-ash);
+  border-radius: 8px;
+  background: var(--color-parchment);
+  padding: 16px 28px;
+}
+
+.release-col h4 {
+  margin: 0 0 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: -0.4px;
+  text-transform: uppercase;
+  color: var(--color-smoke);
+}
+
+.image-path .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.image-path .icon-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.image-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-path code {
+  margin-right: auto;
+  overflow-wrap: anywhere;
+  font-size: 15px;
 }
 
 .arch {
@@ -538,6 +620,10 @@ details.platform summary {
 @media (prefers-reduced-motion: reduce) {
   .arch-edge {
     animation: none;
+  }
+
+  .accordion-chevron {
+    transition: none;
   }
 }
 
@@ -703,6 +789,10 @@ pre {
   .wash {
     top: 16px;
     bottom: 16px;
+  }
+
+  .release-split {
+    grid-template-columns: 1fr;
   }
 
   .stats {
