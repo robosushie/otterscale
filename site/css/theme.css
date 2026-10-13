@@ -428,7 +428,7 @@ details.platform summary {
 .arch-board {
   position: relative;
   width: 980px;
-  height: 640px;
+  height: 700px;
   margin: 0 auto;
   user-select: none;
 }
@@ -443,9 +443,10 @@ details.platform summary {
 
 .arch-card {
   position: absolute;
-  width: 200px;
+  width: 220px;
+  height: 118px;
   margin: 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--color-ash);
   border-radius: 8px;
   background: var(--color-paper);
@@ -453,6 +454,10 @@ details.platform summary {
   text-align: left;
   cursor: default;
   font: inherit;
+}
+
+.arch-card.is-container {
+  border-color: var(--color-off-black);
 }
 
 .arch-card:hover,
@@ -463,19 +468,38 @@ details.platform summary {
   outline: none;
 }
 
+.arch-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-smoke);
+}
+
+.arch-kicker .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
+}
+
 .arch-title {
   display: block;
+  margin-top: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-ash);
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 400;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .arch-sub {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
-  color: var(--color-smoke);
+  color: var(--color-graphite);
 }
 
 .arch-caption {

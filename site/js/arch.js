@@ -2,42 +2,92 @@
   const host = document.querySelector("[data-arch]");
   if (!host) return;
 
-  const cardW = 200;
-  const cardH = 72;
+  const cardW = 220;
+  const cardH = 118;
   const nodes = [
-    { id: "browser", title: "Browser", sub: "Console UI", x: 40, y: 24 },
-    { id: "clients", title: "Tailscale clients", sub: "Official apps", x: 740, y: 24 },
-    { id: "edge", title: "Edge", sub: "Caddy and tsnet", x: 390, y: 168 },
-    { id: "console", title: "Console", sub: "Static Vite app", x: 40, y: 340 },
-    { id: "core", title: "Core", sub: "Go API", x: 390, y: 340 },
-    { id: "hs", title: "Headscale", sub: "Coordination", x: 740, y: 340 },
-    { id: "mesh", title: "Mesh", sub: "Published apps", x: 180, y: 530 },
-    { id: "data", title: "Data", sub: "SQLite or Postgres", x: 600, y: 530 },
+    {
+      id: "devices",
+      title: "Devices",
+      sub: "Laptops, phones, servers",
+      icon: "devices",
+      x: 380,
+      y: 16,
+    },
+    {
+      id: "edge",
+      title: "Edge",
+      sub: "Caddy and tsnet",
+      icon: "router",
+      container: true,
+      x: 380,
+      y: 188,
+    },
+    {
+      id: "console",
+      title: "Console",
+      sub: "Vite app",
+      icon: "web",
+      container: true,
+      x: 24,
+      y: 372,
+    },
+    {
+      id: "core",
+      title: "Core",
+      sub: "Go API",
+      icon: "api",
+      container: true,
+      x: 380,
+      y: 372,
+    },
+    {
+      id: "hs",
+      title: "Headscale",
+      sub: "Coordination",
+      icon: "hub",
+      container: true,
+      x: 736,
+      y: 372,
+    },
+    {
+      id: "apps",
+      title: "Apps",
+      sub: "Published on a device",
+      icon: "widgets",
+      x: 24,
+      y: 556,
+    },
+    {
+      id: "db",
+      title: "Database",
+      sub: "SQLite or Postgres",
+      icon: "database",
+      x: 520,
+      y: 556,
+    },
   ];
   const links = [
-    ["browser", "edge", "bottom", "top", -36],
-    ["clients", "edge", "bottom", "top", 36],
-    ["edge", "console", "bottom", "top", -48],
+    ["devices", "edge", "bottom", "top", 0],
+    ["edge", "console", "bottom", "top", 0],
     ["edge", "core", "bottom", "top", 0],
-    ["edge", "hs", "bottom", "top", 48],
-    ["edge", "mesh", "bottom", "top", -70],
+    ["edge", "hs", "bottom", "top", 0],
+    ["edge", "apps", "bottom", "top", 0],
     ["core", "hs", "right", "left", 0],
-    ["core", "data", "bottom", "top", -28],
-    ["hs", "data", "bottom", "top", 28],
+    ["core", "db", "bottom", "top", -36],
+    ["hs", "db", "bottom", "top", 36],
   ];
   const copy = {
-    browser: "The browser opens the console through edge TLS. API calls stay on the same host.",
-    clients:
-      "Official Tailscale apps use the login server. Locally that is http://127.0.0.1:8080. In production it is OTTERSCALE_DOMAIN.",
-    edge: "Caddy terminates TLS for the console, Headscale, and published apps. The tsnet process joins as hostname edge with tag:edge. Init mints that key onto the secrets volume.",
-    console: "The Vite app is static files. It talks to the Go API on /api and listens on /api/live.",
-    core: "Core owns sessions, workspaces, policy, audit, and machine keys. It calls the Headscale API and writes routes.json for edge.",
-    hs: "Headscale is the coordination engine, one process for this tailnet. It keeps its own SQLite state. This is not Funnel.",
-    data: "An empty DATABASE_URL creates /data/otterscale.db. postgres:// uses Postgres. Headscale state stays in its own SQLite file.",
-    mesh: "Published apps are reached on 100.64.0.0/10 through the edge node. This hop is not Funnel.",
+    devices:
+      "Laptops, phones, and servers run the official Tailscale app. They open the console in a browser and join this login server. Otterscale does not ship its own VPN client.",
+    edge: "The edge container terminates TLS and routes the console, the API, and Headscale. Its tsnet process joins as hostname edge with tag:edge and proxies published apps onto the device that hosts them.",
+    console: "The console container serves the static Vite app. The browser talks to Core on /api and listens on /api/live.",
+    core: "The core container is the Go API. It owns sessions, workspaces, policy, audit, and auth keys, and calls the Headscale API.",
+    hs: "The Headscale container is the coordination server for this tailnet. Init mints its API key onto the secrets volume. This is not Funnel.",
+    apps: "An app is a service already running on a laptop or server. Edge reverse-proxies its hostname onto that device's address. The app is not a separate container in this stack.",
+    db: "Core uses SQLite at /data/otterscale.db when DATABASE_URL is empty, or Postgres when the URL is postgres://. Headscale keeps a separate SQLite file on its own volume.",
   };
   const idle =
-    "Hover a box. Init mints Headscale keys onto the secrets volume. Edge joins as tag:edge. Published apps use the mesh, not Funnel.";
+    "Hover a box. Devices join through the edge container. Core keeps state in SQLite or Postgres. A published app stays on the device that runs it.";
 
   function byId(id) {
     return nodes.find((node) => node.id === id);
@@ -79,9 +129,17 @@
     .join("");
 
   const cardMarkup = nodes
-    .map(
-      (node) =>
-        '<button type="button" class="arch-card" data-id="' +
+    .map((node) => {
+      const kind = node.container ? " is-container" : "";
+      const kicker = node.container
+        ? '<span class="material-symbols-outlined" aria-hidden="true">' +
+          node.icon +
+          "</span><span>Container</span>"
+        : '<span class="material-symbols-outlined" aria-hidden="true">' + node.icon + "</span>";
+      return (
+        '<button type="button" class="arch-card' +
+        kind +
+        '" data-id="' +
         node.id +
         '" style="left:' +
         node.x +
@@ -91,17 +149,20 @@
         node.title +
         ", " +
         node.sub +
-        '"><span class="arch-title">' +
+        '"><span class="arch-kicker">' +
+        kicker +
+        '</span><span class="arch-title">' +
         node.title +
         '</span><span class="arch-sub">' +
         node.sub +
-        "</span></button>",
-    )
+        "</span></button>"
+      );
+    })
     .join("");
 
   host.innerHTML =
     '<div class="arch-board">' +
-    '<svg class="arch-wires" viewBox="0 0 980 640" role="img" aria-label="Otterscale architecture">' +
+    '<svg class="arch-wires" viewBox="0 0 980 700" role="img" aria-label="Otterscale architecture">' +
     edgeMarkup +
     "</svg>" +
     cardMarkup +
