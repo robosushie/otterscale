@@ -32,7 +32,7 @@ Indicative staffing: one to three full-time engineers; dates are estimates, not 
 
 ### Platform & engineering
 
-- [ ] Monorepo layout per spec (`cmd/`, `internal/headscale`, `policy/`, `web/`, `deploy/`, `test/`)
+- [ ] Monorepo layout per spec (`cmd/`, `internal/headscale`, `policy/`, `web/`, `deployment/`, `test/`)
 - [ ] CI: Headscale integration harness; matrix of official client versions (minimum per pinned Headscale, e.g. v1.80.0+ for v0.29.x)
 - [ ] Headscale adapter: **API only** (gRPC/REST v2)—no shelling out to `headscale` CLI
 - [ ] PostgreSQL control DB; SQLite per tenant Headscale instance

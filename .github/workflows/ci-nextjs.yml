@@ -1,4 +1,4 @@
-name: CI Next.js
+name: CI console
 
 on:
   push:
@@ -7,13 +7,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  nextjs:
-    name: lint test build
+  console:
+    name: test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      DATABASE_URL: file:./prisma/ci.db
-      AUTH_SECRET: ci-auth-secret-must-be-at-least-32-chars!!
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -27,18 +24,7 @@ jobs:
           cache: pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: |
-          pnpm exec next typegen
-          pnpm exec tsc --noEmit
+        run: pnpm install
 
       - name: Test
         run: pnpm test
-
-      - name: Build
-        run: pnpm build

@@ -22,16 +22,19 @@ jobs:
       matrix:
         include:
           - name: app
-            file: deploy/Dockerfile
+            file: deployment/app/Dockerfile
+            context: .
+          - name: core
+            file: deployment/core/Dockerfile
             context: .
           - name: edge
-            file: deploy/edge/Dockerfile
+            file: deployment/edge/Dockerfile
             context: .
           - name: headscale
-            file: deploy/headscale/Dockerfile
-            context: deploy/headscale
+            file: deployment/headscale/Dockerfile
+            context: deployment/headscale
           - name: standalone
-            file: deploy/standalone/Dockerfile
+            file: deployment/standalone/Dockerfile
             context: .
     steps:
       - uses: actions/checkout@v4

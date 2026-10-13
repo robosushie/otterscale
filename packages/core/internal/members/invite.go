@@ -1,0 +1,227 @@
+package members
+
+import (
+	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
+	"errors"
+	"strings"
+	"time"
+
+	"otterscale/core/internal/audit"
+	"otterscale/core/internal/auth"
+	"otterscale/core/internal/db"
+	"otterscale/core/internal/id"
+	"otterscale/core/internal/org"
+)
+
+type Invite struct {
+	ID             string
+	OrganizationID string
+	Email          string
+	Username       string
+	TenantRole     string
+	PlatformRole   sql.NullString
+	GroupIDs       []string
+}
+
+func CreateInvite(ctx context.Context, database *db.DB, actorID, email, username, tenantRole string, platformRole *string, groupIDs []string) (code, inviteID string, expires time.Time, err error) {
+	organisation, err := org.Default(ctx, database)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	username = strings.TrimSpace(username)
+	raw := make([]byte, 24)
+	if _, err := rand.Read(raw); err != nil {
+		return "", "", time.Time{}, err
+	}
+	code = base64.RawURLEncoding.EncodeToString(raw)
+	hash, err := auth.HashPassword(code)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	now := time.Now().UTC()
+	expires = now.Add(7 * 24 * time.Hour)
+	_, _ = database.Exec(ctx, `UPDATE "UserInvite" SET "revokedAt"=? WHERE "organizationId"=? AND lower("email")=? AND "redeemedAt" IS NULL AND "revokedAt" IS NULL`, now, organisation.ID, email)
+	inviteID = id.New()
+	var role any
+	if platformRole != nil && *platformRole != "" {
+		role = *platformRole
+	}
+	if _, err := database.Exec(ctx, `INSERT INTO "UserInvite" ("id","organizationId","email","username","codeHash","tenantRole","platformRole","createdById","expiresAt","createdAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		inviteID, organisation.ID, email, username, hash, tenantRole, role, actorID, expires, now); err != nil {
+		return "", "", time.Time{}, err
+	}
+	for _, groupID := range groupIDs {
+		if _, err := database.Exec(ctx, `INSERT INTO "UserInviteWorkspace" ("inviteId","groupId") VALUES (?,?)`, inviteID, groupID); err != nil {
+			return "", "", time.Time{}, err
+		}
+	}
+	_ = audit.Append(ctx, database, organisation.ID, actorID, "member.invite_created", "SYSTEM", "user_invite", inviteID, map[string]any{
+		"email": email, "username": username, "tenantRole": tenantRole, "platformRole": role, "workspaceIds": groupIDs,
+	})
+	return code, inviteID, expires, nil
+}
+
+func FindInviteByCode(ctx context.Context, database *db.DB, code string) (Invite, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return Invite{}, sql.ErrNoRows
+	}
+	rows, err := database.Query(ctx, `SELECT "id","organizationId","email","username","codeHash","tenantRole","platformRole","expiresAt" FROM "UserInvite" WHERE "revokedAt" IS NULL AND "redeemedAt" IS NULL`)
+	if err != nil {
+		return Invite{}, err
+	}
+	defer rows.Close()
+	now := time.Now().UTC()
+	for rows.Next() {
+		var invite Invite
+		var hash string
+		var expires time.Time
+		if err := rows.Scan(&invite.ID, &invite.OrganizationID, &invite.Email, &invite.Username, &hash, &invite.TenantRole, &invite.PlatformRole, &expires); err != nil {
+			return Invite{}, err
+		}
+		if !expires.After(now) || !auth.VerifyPassword(code, hash) {
+			continue
+		}
+		ids, err := database.Query(ctx, `SELECT "groupId" FROM "UserInviteWorkspace" WHERE "inviteId"=?`, invite.ID)
+		if err != nil {
+			return Invite{}, err
+		}
+		for ids.Next() {
+			var groupID string
+			_ = ids.Scan(&groupID)
+			invite.GroupIDs = append(invite.GroupIDs, groupID)
+		}
+		ids.Close()
+		return invite, nil
+	}
+	return Invite{}, sql.ErrNoRows
+}
+
+func ApplyInvite(ctx context.Context, database *db.DB, userID, email string, invite Invite) error {
+	now := time.Now().UTC()
+	if invite.PlatformRole.Valid && invite.PlatformRole.String == "SUPER_ADMIN" {
+		_, _ = database.Exec(ctx, `INSERT INTO "PlatformMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?) ON CONFLICT ("userId","role") DO NOTHING`, id.New(), userID, "SUPER_ADMIN", now)
+	}
+	var tenantID string
+	err := database.QueryRow(ctx, `SELECT "id" FROM "TenantMembership" WHERE "userId"=? ORDER BY "createdAt" ASC LIMIT 1`, userID).Scan(&tenantID)
+	if errors.Is(err, sql.ErrNoRows) {
+		_, err = database.Exec(ctx, `INSERT INTO "TenantMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?)`, id.New(), userID, invite.TenantRole, now)
+	} else if err == nil {
+		_, err = database.Exec(ctx, `UPDATE "TenantMembership" SET "role"=? WHERE "id"=?`, invite.TenantRole, tenantID)
+	}
+	if err != nil {
+		return err
+	}
+	groupIDs := map[string]struct{}{}
+	for _, groupID := range invite.GroupIDs {
+		groupIDs[groupID] = struct{}{}
+	}
+	linked, err := database.Query(ctx, `SELECT "groupId" FROM "GroupMember" WHERE lower("email")=?`, strings.ToLower(email))
+	if err != nil {
+		return err
+	}
+	for linked.Next() {
+		var groupID string
+		_ = linked.Scan(&groupID)
+		groupIDs[groupID] = struct{}{}
+	}
+	linked.Close()
+	for groupID := range groupIDs {
+		_, err = database.Exec(ctx, `INSERT INTO "GroupMember" ("id","groupId","userId","email","createdAt") VALUES (?,?,?,?,?) ON CONFLICT ("groupId","email") DO UPDATE SET "userId"=excluded."userId"`,
+			id.New(), groupID, userID, strings.ToLower(email), now)
+		if err != nil {
+			return err
+		}
+		_, err = database.Exec(ctx, `INSERT INTO "WorkspaceMembership" ("id","userId","groupId","role","createdAt") VALUES (?,?,?,?,?) ON CONFLICT ("userId","groupId") DO UPDATE SET "role"=excluded."role"`,
+			id.New(), userID, groupID, invite.TenantRole, now)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = database.Exec(ctx, `UPDATE "UserInvite" SET "redeemedAt"=?, "redeemedByUserId"=? WHERE "id"=?`, now, userID, invite.ID)
+	if err != nil {
+		return err
+	}
+	return audit.Append(ctx, database, invite.OrganizationID, userID, "member.invite_redeemed", "SYSTEM", "user_invite", invite.ID, nil)
+}
+
+func RevokeInvite(ctx context.Context, database *db.DB, inviteID string) error {
+	organisation, err := org.Default(ctx, database)
+	if err != nil {
+		return err
+	}
+	_, err = database.Exec(ctx, `UPDATE "UserInvite" SET "revokedAt"=? WHERE "id"=? AND "organizationId"=? AND "redeemedAt" IS NULL AND "revokedAt" IS NULL`, time.Now().UTC(), inviteID, organisation.ID)
+	return err
+}
+
+func UpsertOIDCUser(ctx context.Context, database *db.DB, sub, email, name string) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	sub = strings.TrimSpace(sub)
+	if email == "" || sub == "" {
+		return "", errors.New("OIDC account is missing email or subject")
+	}
+	var userID string
+	err := database.QueryRow(ctx, `SELECT "id" FROM "User" WHERE "oidcSub"=?`, sub).Scan(&userID)
+	if err == nil {
+		return userID, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	err = database.QueryRow(ctx, `SELECT "id" FROM "User" WHERE lower("email")=?`, email).Scan(&userID)
+	now := time.Now().UTC()
+	if err == nil {
+		_, err = database.Exec(ctx, `UPDATE "User" SET "oidcSub"=?, "emailVerified"=COALESCE("emailVerified", ?), "updatedAt"=? WHERE "id"=?`, sub, now, now, userID)
+		return userID, err
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	username, err := uniqueUsername(ctx, database, email)
+	if err != nil {
+		return "", err
+	}
+	userID = id.New()
+	var display any
+	if strings.TrimSpace(name) != "" {
+		display = name
+	}
+	_, err = database.Exec(ctx, `INSERT INTO "User" ("id","username","email","emailVerified","name","oidcSub","totpEnabled","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?)`,
+		userID, username, email, now, display, sub, false, now, now)
+	return userID, err
+}
+
+func uniqueUsername(ctx context.Context, database *db.DB, email string) (string, error) {
+	local := strings.Split(email, "@")[0]
+	var b strings.Builder
+	for _, r := range strings.ToLower(local) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	base := strings.Trim(b.String(), ".-_")
+	if len(base) < 3 {
+		base = "user"
+	}
+	if len(base) > 24 {
+		base = base[:24]
+	}
+	for i := 0; i < 20; i++ {
+		candidate := base
+		if i > 0 {
+			candidate = base + "-" + id.New()[:6]
+		}
+		var n int
+		if err := database.QueryRow(ctx, `SELECT COUNT(*) FROM "User" WHERE "username"=?`, candidate).Scan(&n); err != nil {
+			return "", err
+		}
+		if n == 0 {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("could not allocate a username")
+}

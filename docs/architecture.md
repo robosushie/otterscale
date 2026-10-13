@@ -8,9 +8,9 @@ Reference: [design specification PDF](./external/Otterscale_Design_Architecture.
 
 ### Current implementation (Phase 1–2, single tenant)
 
-The shipping control plane is a **Next.js 16** app with **Prisma 6** on SQLite (`DATABASE_URL`). One organisation, one Headscale instance (optional in dev), **workspaces as the isolation unit** (Headscale ACL groups), **tags** as orthogonal ACL labels, policy compiler, audit hash chain, and RBAC (**Owner / Super admin / Admin / Member**). Auth: **Auth.js** with **local credentials + TOTP always on**; generic OIDC enables automatically when issuer, client id, and client secret are all set. The console sidebar is Network (Machines, Apps), Users, Access controls (Workspaces, Policies), Audit (System / Network logs), and Settings (General, User management, Device management, Policy file, Keys). Prisma stores ACL **groups** as workspaces. **Network Apps** are published through one **`edge`** container: Caddy terminates TLS (`console.localhost`, `hs.localhost`, `*.apps.localhost`) and a Go `tsnet` process (hostname `edge` / `tag:edge`) reverse-proxies onto mesh IPs and answers TCP probes on `:4180`. Official Tailscale clients join at `http://127.0.0.1:8080` locally, or at `OTTERSCALE_DOMAIN` when that env is set. `headscale/headscale` is the coordination server. This is not Tailscale Funnel. Billing, Funnel, Mullvad, and Tailnet Lock are out of Phase 1–2. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
+The shipping control plane is a **Go** service in `packages/core` with a **Vite** console in `packages/app`. `DATABASE_URL` selects Postgres (`postgres://`), a SQLite file (`file:` or `sqlite:`), or a new `/data/otterscale.db` when it is empty. One organisation, one Headscale instance (optional in dev), **workspaces as the isolation unit** (Headscale ACL groups), **tags** as orthogonal ACL labels, policy compiler, audit hash chain, and RBAC (**Owner / Super admin / Admin / Member**). Auth is a core session cookie with **local credentials + TOTP always on**; generic OIDC enables automatically when issuer, client id, and client secret are all set. The console sidebar is Network (Machines, Apps), Users, Access controls (Workspaces, Policies), Audit (System / Network logs), and Settings (General, User management, Device management, Policy file, Keys). The database stores ACL **groups** as workspaces. **Network Apps** are published through one **`edge`** container: Caddy terminates TLS (`console.localhost`, `hs.localhost`, `*.apps.localhost`) and a Go `tsnet` process (hostname `edge` / `tag:edge`) reverse-proxies onto mesh IPs and answers TCP probes on `:4180`. Official Tailscale clients join at `http://127.0.0.1:8080` locally, or at `OTTERSCALE_DOMAIN` when that env is set. `headscale/headscale` is the coordination server. This is not Tailscale Funnel. Billing, Funnel, Mullvad, and Tailnet Lock are out of Phase 1–2. Multi-tenant orchestration (N Headscale processes) remains a later epic per [roadmap](./roadmap.md).
 
-Code layout: `app/` (routes), `components/`, `lib/` (`headscale/` adapter only for Headscale HTTP), `cmd/proxy` (Go tsnet Network Apps hop, runs inside `edge`), `internal/appsproxy/`, `prisma/`, `deploy/`.
+Code layout: `packages/app` (Vite console), `packages/core` (API, database, Headscale adapter), `packages/edge` (tsnet proxy), `deployment/`.
 
 ---
 
@@ -139,10 +139,10 @@ Creating a tenant: allocate IP prefix, ports, data directory → render config �
 
 ### Console (`web/`)
 
-- Single Next.js (or spec: React/SvelteKit) app served as static assets or SSR
+- Vite React app in `packages/app`, served as static files
 - Areas: **Platform**, **Workspace**, **Network**, **Audit & analytics**, **My access**, **Connect**
-- Real-time: SSE for approvals, device online, policy apply status
-- Visual design: [theme.md](./theme.md) — tokens in `app/globals.css`, no scattered hex in components
+- Real-time: `GET /api/live` SSE for machines and workspaces
+- Visual design: [theme.md](./theme.md) — tokens in `packages/app/src/styles.css`, no scattered hex in components
 
 ### DERP / STUN
 
@@ -285,13 +285,13 @@ Headscale SQLite holds nodes, keys, routes, applied policy file—**not** Otters
 |-------|--------|-------|
 | Backend | Go | Same ecosystem as Headscale; static binaries |
 | Control DB | PostgreSQL | JSONB for snapshots; row-level tenant scoping |
-| Console | TypeScript, Next.js, Tailwind | [theme.md](./theme.md); Monaco policy editor; optional React Flow |
+| Console | TypeScript, Vite, React, Tailwind | [theme.md](./theme.md) |
 | Jobs | Postgres queue (River) or NATS | Prefer queue on Postgres for small installs |
 | Metrics | Prometheus; optional ClickHouse | Headscale + platform metrics |
 | Auth | OIDC; API keys; SCIM later | Step-up MFA for Platform area |
 | Network client | Official Tailscale / tailscaled | Otterscale does not fork client core for v1 |
 
-Current repo: Next.js scaffold for console shell; backend services to be added per [roadmap](./roadmap.md).
+Current repo: Vite console in `packages/app`, Go API in `packages/core`, tsnet proxy in `packages/edge`.
 
 ---
 
@@ -313,7 +313,7 @@ otterscale/
   web/           role-based console (may live at repo root app/ initially)
   connect/       Connect templates, MDM snippets
   sdk/           go, python, typescript, terraform-provider
-  deploy/        compose, helm, caddy/nginx refs, derp
+  deployment/        compose, helm, caddy/nginx refs, derp
   docs/
   test/          Headscale + client version matrix
 ```

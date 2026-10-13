@@ -3,8 +3,8 @@ import { resolve } from "path";
 import { describe, expect, it } from "vitest";
 
 describe("local stack compose", () => {
-  const compose = readFileSync(resolve(process.cwd(), "deploy/docker-compose.yml"), "utf8");
-  const bootstrap = readFileSync(resolve(process.cwd(), "deploy/headscale/bootstrap.sh"), "utf8");
+  const compose = readFileSync(resolve(process.cwd(), "deployment/docker-compose.yml"), "utf8");
+  const bootstrap = readFileSync(resolve(process.cwd(), "deployment/headscale/bootstrap.sh"), "utf8");
   const script = readFileSync(resolve(process.cwd(), "scripts/deploy-stack.mjs"), "utf8");
   const workflow = readFileSync(
     resolve(process.cwd(), ".github/workflows/publish-ghcr.yml"),
@@ -25,17 +25,31 @@ describe("local stack compose", () => {
     expect(compose).toContain("condition: service_completed_successfully");
   });
 
-  it("normalizes the app entrypoint for every host OS", () => {
-    const dockerfile = readFileSync(resolve(process.cwd(), "deploy/Dockerfile"), "utf8");
+  it("runs core and the static console as separate services", () => {
+    expect(compose).toContain("\n  core:");
+    expect(compose).toContain("\n  app:");
+    expect(compose).toContain("deployment/core/Dockerfile");
+    const coreImage = readFileSync(resolve(process.cwd(), "deployment/core/Dockerfile"), "utf8");
+    const coreEntrypoint = readFileSync(resolve(process.cwd(), "deployment/core/entrypoint.sh"), "utf8");
+    expect(coreImage).toContain("COPY deployment/core/entrypoint.sh /entrypoint.sh");
+    expect(coreImage).toContain('ENTRYPOINT ["/entrypoint.sh"]');
+    expect(coreEntrypoint).toContain("load_secret HEADSCALE_API_KEY");
+    expect(compose).toContain("deployment/app/Dockerfile");
+    expect(compose).toContain("DATABASE_URL: ${DATABASE_URL:-}");
+    expect(compose).not.toContain("postgres:");
+  });
+
+  it("normalizes shell entrypoints for every host OS", () => {
+    const dockerfile = readFileSync(resolve(process.cwd(), "deployment/edge/Dockerfile"), "utf8");
     const attributes = readFileSync(resolve(process.cwd(), ".gitattributes"), "utf8");
-    expect(dockerfile).toContain("sed -i 's/\\r$//' /docker-entrypoint.sh");
+    expect(dockerfile).toContain("sed -i 's/\\r$//' /entrypoint.sh");
     expect(attributes).toContain("*.sh text eol=lf");
     for (const rel of [
-      "deploy/docker-entrypoint.sh",
-      "deploy/edge/entrypoint.sh",
-      "deploy/headscale/entrypoint.sh",
-      "deploy/headscale/bootstrap.sh",
-      "deploy/standalone/entrypoint.sh",
+      "deployment/core/entrypoint.sh",
+      "deployment/edge/entrypoint.sh",
+      "deployment/headscale/entrypoint.sh",
+      "deployment/headscale/bootstrap.sh",
+      "deployment/standalone/entrypoint.sh",
     ]) {
       expect(readFileSync(resolve(process.cwd(), rel), "utf8"), rel).not.toContain("\r");
     }
@@ -53,6 +67,7 @@ describe("local stack compose", () => {
 
   it("still publishes the split images", () => {
     expect(workflow).toContain("name: app");
+    expect(workflow).toContain("name: core");
     expect(workflow).toContain("name: edge");
     expect(workflow).toContain("name: headscale");
   });

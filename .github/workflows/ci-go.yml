@@ -16,14 +16,16 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: packages/core/go.mod
           cache: true
 
       - name: Test
-        run: go test ./...
+        run: go test ./packages/core/... ./packages/edge/...
 
       - name: Vet
-        run: go vet ./...
+        run: go vet ./packages/core/... ./packages/edge/...
 
-      - name: Build proxy
-        run: go build -o /tmp/proxy ./cmd/proxy
+      - name: Build
+        run: |
+          go build -o /tmp/core ./packages/core/cmd/core
+          go build -o /tmp/proxy ./packages/edge/cmd/proxy

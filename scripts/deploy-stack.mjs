@@ -19,8 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const envPath = path.join(repoRoot, ".env");
 const envExamplePath = path.join(repoRoot, ".env.example");
-const composeFile = path.join(repoRoot, "deploy/docker-compose.yml");
-const otherComposeFile = path.join(repoRoot, "deploy/docker-compose.standalone.yml");
+const composeFile = path.join(repoRoot, "deployment/docker-compose.yml");
+const otherComposeFile = path.join(repoRoot, "deployment/docker-compose.standalone.yml");
 
 const STACK_DATABASE_URL = "file:/data/otterscale.db";
 const LOCAL_LOGIN_SERVER = "http://127.0.0.1:8080";
@@ -141,11 +141,10 @@ function ensureEnvDefaults(content) {
   }
 
   const db = map.get("DATABASE_URL")?.trim() ?? "";
-  const looksLikePostgres = /^postgres(ql)?:\/\//i.test(db);
   const looksLikeHostSqlite = db.startsWith("file:./") || db.startsWith("file:prisma/");
-  if (!db || looksLikePostgres || looksLikeHostSqlite) {
+  if (looksLikeHostSqlite) {
     updates.set("DATABASE_URL", STACK_DATABASE_URL);
-    console.log("Set DATABASE_URL to SQLite file:/data/otterscale.db (app volume)");
+    console.log("Set DATABASE_URL to SQLite file:/data/otterscale.db (core volume)");
   }
 
   const authUrl = map.get("AUTH_URL")?.trim() ?? "";

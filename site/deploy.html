@@ -79,7 +79,7 @@
               <li>Download <a href="./assets/otterscale-standalone.yaml" download>otterscale-standalone.yaml</a> and the <a href="./assets/otterscale-standalone.env.example" download>standalone env</a>.</li>
               <li>Copy the env example to <code>.env</code>. Set <code>OTTERSCALE_DOMAIN</code> and <code>AUTH_URL</code> in production.</li>
               <li>Run <code>docker compose -f otterscale-standalone.yaml --env-file .env up -d</code>, or <code>pnpm deploy:standalone</code> from a git checkout.</li>
-              <li>PaaS: Dockerfile <code>deploy/standalone/Dockerfile</code>, disk at <code>/data</code>. The platform sets <code>PORT</code>. Set <code>CONSOLE_HOST</code> and <code>HS_HOST</code> to the public hostnames.</li>
+              <li>PaaS: Dockerfile <code>deployment/standalone/Dockerfile</code>, disk at <code>/data</code>. The platform sets <code>PORT</code>. Set <code>CONSOLE_HOST</code> and <code>HS_HOST</code> to the public hostnames.</li>
             </ol>
           </div>
         </details>
@@ -158,7 +158,7 @@
           </summary>
           <div class="body">
             <ol class="steps">
-              <li>Preferred: one web service from <code>ghcr.io/robosushie/otterscale/standalone</code> (or Dockerfile <code>deploy/standalone/Dockerfile</code>).</li>
+              <li>Preferred: one web service from <code>ghcr.io/robosushie/otterscale/standalone</code> (or Dockerfile <code>deployment/standalone/Dockerfile</code>).</li>
               <li>Attach a persistent disk at <code>/data</code>. Render sets <code>PORT</code>; Caddy listens there.</li>
               <li>Set <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> to the public HTTPS hostnames.</li>
               <li>A Render VM with Docker and pnpm can run <code>pnpm deploy:stack</code> instead.</li>
@@ -173,7 +173,7 @@
           </summary>
           <div class="body">
             <ol class="steps">
-              <li>One service from <code>ghcr.io/robosushie/otterscale/standalone</code> (or Dockerfile <code>deploy/standalone/Dockerfile</code>).</li>
+              <li>One service from <code>ghcr.io/robosushie/otterscale/standalone</code> (or Dockerfile <code>deployment/standalone/Dockerfile</code>).</li>
               <li>Volume at <code>/data</code>. Railway sets <code>PORT</code>; do not run the three-service Compose file here.</li>
               <li>Set <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> to the public HTTPS domains on that service.</li>
               <li>Bootstrap inside the container mints API keys onto the disk. No inbound UDP for your own DERP.</li>
