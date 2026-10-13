@@ -1,0 +1,46 @@
+{
+	local_certs
+}
+
+{$CONSOLE_HOST:console.localhost} {
+	tls internal
+	handle /api/* {
+		reverse_proxy 127.0.0.1:4000 {
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+				write_timeout 1h
+			}
+		}
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
+
+http://{$HS_HOST:hs.localhost} {
+	handle /generate_204 {
+		respond 204
+	}
+	handle * {
+		redir https://{host}{uri}
+	}
+}
+
+{$HS_HOST:hs.localhost} {
+	tls internal
+	reverse_proxy 127.0.0.1:18080 {
+		header_up True-Client-IP {remote_host}
+		header_up X-Real-IP {remote_host}
+		flush_interval -1
+		transport http {
+			read_timeout 1h
+			write_timeout 1h
+		}
+	}
+}
+
+*.{$APPS_BASE_DOMAIN:apps.localhost} {
+	tls internal
+	reverse_proxy 127.0.0.1:8081
+}

@@ -2,23 +2,22 @@
 
 Self-hosted team mesh control. No per-seat lock-in. A console on [Headscale](https://github.com/juanfont/headscale) for workspaces, tags, keys, and Network Apps — people join with **official Tailscale clients** only.
 
-[![CI Next.js](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml)
+[![CI console](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml)
 [![CI Go](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml)
 [![GitHub Pages](https://github.com/robosushie/otterscale/actions/workflows/pages.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/pages.yml)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](./LICENSE)
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=flat-square)](https://vite.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square)](https://react.dev/)
-[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=flat-square)](https://www.prisma.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=flat-square)](https://go.dev/)
 [![pnpm](https://img.shields.io/badge/pnpm-10-F69220?style=flat-square)](https://pnpm.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square)](https://docs.docker.com/compose/)
 [![Headscale](https://img.shields.io/badge/Headscale-0.23-4B32C3?style=flat-square)](https://github.com/juanfont/headscale)
-[![Auth.js](https://img.shields.io/badge/Auth.js-5-black?style=flat-square)](https://authjs.dev/)
+[![Argon2](https://img.shields.io/badge/Argon2id-PHC-black?style=flat-square)](https://github.com/P-H-C/phc-string-format)
 [![Caddy](https://img.shields.io/badge/Caddy-2-1F4D34?style=flat-square)](https://caddyserver.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square)](https://www.sqlite.org/)
-[![GHCR](https://img.shields.io/badge/GHCR-app%20%7C%20edge%20%7C%20headscale-2496ED?style=flat-square)](https://github.com/robosushie/otterscale/pkgs/container/otterscale%2Fapp)
+[![GHCR](https://img.shields.io/badge/GHCR-app%20%7C%20core%20%7C%20edge%20%7C%20headscale%20%7C%20standalone-2496ED?style=flat-square)](https://github.com/robosushie/otterscale/pkgs/container/otterscale%2Fapp)
 
 **Website:** [robosushie.github.io/otterscale](https://robosushie.github.io/otterscale/) — [features](https://robosushie.github.io/otterscale/features.html) · [deploy](https://robosushie.github.io/otterscale/deploy.html)
 
@@ -50,14 +49,14 @@ Roles are Owner, Super admin, Admin, and Member. Workspaces isolate peers. Tags 
 
 | Layer | Tools | Role |
 |-------|--------|------|
-| Console | Next.js 16, React 19, Tailwind v4 | App Router UI |
-| Data | Prisma 6, SQLite | `DATABASE_URL` |
-| Auth | Auth.js, Argon2, otpauth / TOTP, optional OIDC | Local login always on |
+| Console | Vite, React 19, Tailwind v4 | Static UI in `packages/app` |
+| API | Go | `packages/core`: sessions, Headscale, SQLite or Postgres |
+| Auth | Session cookie, Argon2id, TOTP, optional OIDC | Local login always on |
 | Coordinator | Headscale 0.23 | Login-server, Noise, DERP map |
-| Edge | Caddy, Go `cmd/proxy` (`tailscale.com` tsnet) | TLS + Network Apps hop |
+| Edge | Caddy, Go `packages/edge` (`tailscale.com` tsnet) | TLS + Network Apps hop |
 | Clients | Official Tailscale apps | No custom VPN |
 | Ship | Docker Compose, GHCR, GitHub Actions | Build, pull, Pages |
-| Dev | pnpm 10, Node 22, TypeScript, ESLint, Vitest | CI Next.js |
+| Dev | pnpm 10, Node 22, TypeScript, Go 1.25, Vitest | CI console and CI Go |
 
 ## Quick start
 
@@ -69,14 +68,15 @@ Requires [Node.js 22](https://nodejs.org/), [pnpm 10.12.1](https://pnpm.io/), an
    cp .env.example .env
    ```
 
-   Required: `DATABASE_URL` (`file:./prisma/dev.db`), `AUTH_SECRET` (≥32 chars). Local auth is always on. Set `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, and `AUTH_OIDC_CLIENT_SECRET` to enable SSO buttons.
+   Required: `AUTH_SECRET` (≥32 chars). `DATABASE_URL` may be empty (core creates a local SQLite file), a `file:`/`sqlite:` URL, or `postgres://`. Local auth is always on. Set `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, and `AUTH_OIDC_CLIENT_SECRET` to enable SSO.
 
-2. Apply migrations and run:
+2. Run the console and API:
 
    ```bash
-   pnpm db:migrate
    pnpm dev
    ```
+
+   `pnpm dev` starts the Vite console. Run the Go API with `go run ./cmd/core` from `packages/core` (it applies migrations on startup).
 
 3. Open `/setup`. Email, then username + password (min 8), then TOTP. The first account becomes Owner. Default tags: `prod`, `uat`, `dev`.
 
@@ -93,9 +93,19 @@ Requires [Docker](https://docs.docker.com/get-docker/) and Compose.
 
 ```bash
 pnpm deploy:stack
+pnpm deploy:stack --keep-data
 ```
 
-Creates or updates `.env` (generates `AUTH_SECRET`, sets SQLite `DATABASE_URL=file:/data/otterscale.db`), builds images, starts Headscale and `edge`, and writes `HEADSCALE_API_KEY` and `APPS_EDGE_AUTHKEY` after Headscale is healthy. The app container runs `prisma migrate deploy` before `node server.js`. Console: `https://console.localhost`.
+`deploy:stack` is the multi-container product (project `otterscale`). The default **deletes that project's volumes** and starts Headscale, then the init container, then the app and edge. `--keep-data` reuses those volumes. It generates `AUTH_SECRET` in `.env` when needed. Headscale API and edge pre-auth keys are minted onto the `otterscale_secrets` volume — not `.env`. Headscale only stores a hash, so plaintext cannot be read back from SQLite. Console: `https://console.localhost`.
+
+One container (Caddy, Headscale, console, tsnet), project `otterscale-standalone`:
+
+```bash
+pnpm deploy:standalone
+pnpm deploy:standalone --keep-data
+```
+
+Same wipe-or-keep rule, but only the standalone volume. Bootstrap writes keys under `/data/secrets`. The two products do not share volumes. Starting one stops the other so ports 80/443/8080 are free, and leaves the other product's volumes in place.
 
 If `*.localhost` does not resolve:
 
@@ -103,26 +113,22 @@ If `*.localhost` does not resolve:
 127.0.0.1 console.localhost hs.localhost
 ```
 
-To rotate the Headscale API key by hand:
-
-```bash
-docker exec headscale /ko-app/headscale apikeys create --expiration 8760h
-```
-
-Put the printed key in `.env` as `HEADSCALE_API_KEY`, then recreate the app container.
+Do not put `HEADSCALE_API_KEY` or `APPS_EDGE_AUTHKEY` in `.env`. `APPS_EDGE_AUTHKEY` is the pre-auth key the in-container tsnet proxy (`tag:edge`) uses to join this Headscale. Recreate with `pnpm deploy:stack` (or `--keep-data` if the secrets files are still on the volume).
 
 ## Production (GHCR)
 
-On a cloud VM or any Compose host, pull published images instead of building:
+Multi-container hosts use `pnpm deploy:stack` (builds from this repo). One-container hosts pull the standalone image:
+
+Images: `ghcr.io/robosushie/otterscale/{app,edge,headscale,standalone}`. Default tag is `latest`. Semver tags from **Actions → Publish GHCR** also move `latest`. Set `OTTERSCALE_DOMAIN` and `AUTH_URL` in production. Pin `AUTH_SECRET`. The init container (stack) or the standalone entrypoint mints Headscale keys onto that product's volume.
+
+One-container pull:
 
 ```bash
-cp deploy/otterscale-stack.env.example .env
-docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d
+cp deployment/otterscale-standalone.env.example .env
+docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d
 ```
 
-Images: `ghcr.io/robosushie/otterscale/{app,edge,headscale}`. Default tag is `latest`. Semver tags from **Actions → Publish GHCR** also move `latest`. Set `OTTERSCALE_DOMAIN` and `AUTH_URL` in production. Bootstrap mints `HEADSCALE_API_KEY`, `APPS_EDGE_AUTHKEY`, and `AUTH_SECRET` (if empty) after Headscale is healthy.
-
-If pulls return 401, open **Packages** for `app`, `edge`, and `headscale` and set visibility to public.
+If pulls return 401, open **Packages** for `app`, `edge`, `headscale`, and `standalone` and set visibility to public.
 
 Platform notes (cloud VMs, Railway, Heroku): [deploy page](https://robosushie.github.io/otterscale/deploy.html).
 
@@ -132,8 +138,8 @@ Never commit `.env`. Copy from [`.env.example`](./.env.example).
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `DATABASE_URL` | Yes | SQLite path (`file:./prisma/dev.db` locally; `file:/data/otterscale.db` in Docker) |
-| `AUTH_SECRET` | Yes | Auth.js secret, ≥32 characters |
+| `DATABASE_URL` | No | Empty creates `/data/otterscale.db`. `file:`/`sqlite:` opens that file. `postgres://` uses Postgres |
+| `AUTH_SECRET` | Yes | Session secret, ≥32 characters |
 | `AUTH_URL` | Production | Public console origin (`https://console.localhost` locally) |
 | `AUTH_OIDC_ISSUER` | Optional | OIDC issuer; SSO buttons stay off until all three OIDC vars are set |
 | `AUTH_OIDC_CLIENT_ID` | Optional | OIDC client id |
@@ -141,31 +147,29 @@ Never commit `.env`. Copy from [`.env.example`](./.env.example).
 | `AUTH_SETUP_TOKEN` | Optional | Token required for first Owner signup on `/setup` |
 | `HEADSCALE_INTERNAL_URL` | Docker | App → Headscale (`http://headscale:8080`) |
 | `HEADSCALE_PUBLIC_URL` | Docker | Public Headscale URL |
-| `HEADSCALE_API_KEY` | Docker | Filled by bootstrap / `deploy:stack` |
 | `OTTERSCALE_DOMAIN` | Production | Login-server for Add device (HTTPS). Unset → `http://127.0.0.1:8080` |
-| `APPS_EDGE_AUTHKEY` | Docker | Reusable `tag:edge` pre-auth key for the edge container |
 | `APPS_BASE_DOMAIN` | Optional | Network Apps hostname suffix (default `apps.localhost`) |
 
 ## Development
 
-Prereqs: Node 22, pnpm 10.12.1, [Go 1.25](./go.mod) (for `cmd/proxy`), Docker for the stack.
+Prereqs: Node 22, pnpm 10.12.1, [Go 1.25](./packages/core/go.mod), Docker for the stack.
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm dev` | Next.js dev server |
-| `pnpm lint` | ESLint |
-| `pnpm test` | Vitest |
-| `pnpm build` | `prisma generate` + `next build` |
-| `pnpm db:make -- <name>` | New migration from schema (local; autogenerate only) |
-| `pnpm db:migrate` | Apply pending migrations |
-| `pnpm deploy:stack` | Build and run Docker stack |
-| `docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d` | Pull GHCR images |
+| `pnpm dev` | Vite console |
+| `pnpm test` | Vitest deploy contracts |
+| `pnpm build` | Vite production build |
+| `pnpm deploy:stack` | Wipe stack volumes, build, and run |
+| `pnpm deploy:stack --keep-data` | Rebuild stack on existing volumes |
+| `pnpm deploy:standalone` | Wipe standalone volume, build, and run |
+| `pnpm deploy:standalone --keep-data` | Rebuild standalone on existing volume |
+| `docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d` | Pull GHCR standalone image |
 
-After changing `prisma/schema.prisma`, run `pnpm db:make -- descriptive_name`. Never hand-edit `prisma/migrations/`.
+Schema changes are goose SQL under `packages/core/migrations`. Core applies them on startup.
 
 UI follows [docs/theme.md](./docs/theme.md): parchment canvas, Newsreader weight 400, IBM Plex Mono, one Lake Blue primary CTA.
 
-Commits use conventional types: `feat` · `fix` · `refactor` · `chore` · `docs` · `test` · `style`. Pull requests must pass **CI Next.js** and **CI Go**. Do not commit secrets.
+Commits use conventional types: `feat` · `fix` · `refactor` · `chore` · `docs` · `test` · `style`. Pull requests must pass **CI console** and **CI Go**. Do not commit secrets.
 
 Coding agents: [AGENTS.md](./AGENTS.md).
 
@@ -173,13 +177,10 @@ Coding agents: [AGENTS.md](./AGENTS.md).
 
 | Path | Purpose |
 |------|---------|
-| `app/` | Next.js App Router |
-| `components/` | UI |
-| `lib/` | Server: auth, policy, Headscale adapter, Prisma |
-| `cmd/proxy` | Go tsnet Network Apps hop (runs inside `edge`) |
-| `internal/appsproxy/` | Go proxy internals |
-| `prisma/` | Schema and migrations |
-| `deploy/` | Compose, Caddy, Headscale, Dockerfiles, Otterscale Stack |
+| `packages/app` | Vite console |
+| `packages/core` | Go API, database, Headscale adapter |
+| `packages/edge` | Go tsnet Network Apps hop |
+| `deployment/` | Compose, Caddy, Headscale, Dockerfiles |
 | `site/` | GitHub Pages marketing site |
 | `docs/` | Architecture, roadmap, deployment, theme |
 | `tests/` | Vitest |

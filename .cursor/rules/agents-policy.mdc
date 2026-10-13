@@ -5,19 +5,18 @@ alwaysApply: true
 
 # Shared agent policy
 
-Follow [`AGENTS.md`](../../AGENTS.md) at the repo root for Next.js, TypeScript, SOLID, theme, docs, and git commits.
+Follow [`AGENTS.md`](../../AGENTS.md) at the repo root for the Vite console, Go core, TypeScript, SOLID, theme, docs, and git commits.
 
 Modular twins: [`.agents/rules/`](../../.agents/rules/) — `agents-policy.md`, `database-migrations.md`, `typescript-standards.md`, `solid-principles.md`, `theme.md`, `git-commits.md`.
 
-Match existing patterns under `app/` as the console grows; planned Go control plane lives under `cmd/` / `internal/` per `docs/architecture.md`.
+Console lives in `packages/app`. The API and database live in `packages/core`. The tsnet proxy lives in `packages/edge`.
 
 Non-negotiables:
 
-- Read `node_modules/next/dist/docs/` before changing framework behavior
 - No secrets in git; no inventing infra/CDK/deploy unless asked
-- Required env (`DATABASE_URL`, `AUTH_SECRET`) fail loud; local auth always on; incomplete OIDC disables SSO buttons only
+- `AUTH_SECRET` is required and fails loud; empty `DATABASE_URL` creates a SQLite file; local auth always on; incomplete OIDC disables SSO buttons only
 - Product UI → `docs/theme.md`
 - Commits only when the user asks → `git-commits.mdc`
-- Schema changes → `pnpm db:make -- <name>` only; never edit `prisma/migrations/` by hand
+- Schema changes are goose SQL in `packages/core/migrations` (`sqlite/` and `postgres/`)
 
 TypeScript & SOLID details: `.agents/rules/typescript-standards.md`, `.agents/rules/solid-principles.md`.

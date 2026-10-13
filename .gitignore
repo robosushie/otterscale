@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
+# dependencies (repo root and packages/*)
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -19,6 +19,7 @@
 
 # production
 /build
+packages/app/dist
 
 # misc
 .DS_Store
@@ -46,7 +47,7 @@ next-env.d.ts
 /cmd/proxy/proxy.exe
 
 # Caddy local CA exported by pnpm deploy:stack
-/deploy/caddy-root.crt
+/deployment/caddy-root.crt
 
 # sqlite (local / docker volume copies)
 /prisma/*.db

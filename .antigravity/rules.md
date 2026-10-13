@@ -6,7 +6,7 @@ Apply [`.agents/rules/theme.md`](../.agents/rules/theme.md) when editing UI.
 
 **Git commits:** [`.agents/rules/git-commits.md`](../.agents/rules/git-commits.md) — only commit when the user asks; conventional types and imperative subjects.
 
-**Migrations:** [`.agents/rules/database-migrations.md`](../.agents/rules/database-migrations.md) — `pnpm db:make` only; never hand-edit `prisma/migrations/`.
+**Migrations:** [`.agents/rules/database-migrations.md`](../.agents/rules/database-migrations.md) — goose SQL in `packages/core/migrations`.
 
 **Full theme:** [`docs/theme.md`](../docs/theme.md)
 

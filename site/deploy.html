@@ -35,15 +35,15 @@
         <div class="wash" data-wash aria-hidden="true"></div>
         <div class="hero-copy" data-reveal>
           <p class="caption">Otterscale Stack</p>
-          <h1>One Compose file. Pull and run.</h1>
+          <h1>Two deploy commands.</h1>
           <p class="lede">
-            Images live on GHCR. After Headscale is healthy, bootstrap writes API keys and
-            <code>AUTH_SECRET</code>. Set <code>OTTERSCALE_DOMAIN</code> wherever TLS sits in front
-            of Headscale.
+            <code>pnpm deploy:stack</code> builds the multi-container host.
+            <code>pnpm deploy:standalone</code> builds one container. Pull the standalone image
+            when you are not building from this repo.
           </p>
           <div class="actions downloads">
-            <a class="btn btn-primary" href="./assets/otterscale-stack.yaml" download>Download stack ▸</a>
-            <a class="btn btn-ghost" href="./assets/otterscale-stack.env.example" download>Env example</a>
+            <a class="btn btn-primary" href="./assets/otterscale-standalone.yaml" download>Standalone YAML ▸</a>
+            <a class="btn btn-ghost" href="./assets/otterscale-standalone.env.example" download>Standalone env</a>
           </div>
         </div>
       </header>
@@ -60,12 +60,26 @@
           </summary>
           <div class="body">
             <ol class="steps">
-              <li>Install Docker Engine and the Compose plugin.</li>
-              <li>Download <a href="./assets/otterscale-stack.yaml" download>otterscale-stack.yaml</a> and the <a href="./assets/otterscale-stack.env.example" download>env example</a>.</li>
-              <li>Copy the env example to <code>.env</code>. Production: set <code>OTTERSCALE_DOMAIN</code> and <code>AUTH_URL</code>.</li>
-              <li>Run <code>docker compose -f otterscale-stack.yaml --env-file .env up -d</code>.</li>
+              <li>Install Docker Engine, the Compose plugin, Node 22, and pnpm.</li>
+              <li>Clone the repo. Production: set <code>OTTERSCALE_DOMAIN</code> and <code>AUTH_URL</code> in <code>.env</code>.</li>
+              <li>Run <code>pnpm deploy:stack</code>. Add <code>--keep-data</code> to reuse volumes.</li>
               <li>Open <code>https://console.localhost</code> (add a hosts line if needed). First visit: <code>/setup</code>.</li>
               <li>On Machines, copy both commands: <code>tailscale logout</code> then <code>tailscale up</code>. Local login-server is <code>http://127.0.0.1:8080</code>.</li>
+            </ol>
+          </div>
+        </details>
+        <details class="platform" data-reveal>
+          <summary>
+            <span class="material-symbols-outlined" aria-hidden="true">deployed_code</span>
+            One container (standalone)
+          </summary>
+          <div class="body">
+            <ol class="steps">
+              <li>Same host as above, or Railway/Render as a single service.</li>
+              <li>Download <a href="./assets/otterscale-standalone.yaml" download>otterscale-standalone.yaml</a> and the <a href="./assets/otterscale-standalone.env.example" download>standalone env</a>.</li>
+              <li>Copy the env example to <code>.env</code>. Set <code>OTTERSCALE_DOMAIN</code> and <code>AUTH_URL</code> in production.</li>
+              <li>Run <code>docker compose -f otterscale-standalone.yaml --env-file .env up -d</code>, or <code>pnpm deploy:standalone</code> from a git checkout.</li>
+              <li>PaaS: Dockerfile <code>deployment/standalone/Dockerfile</code>, disk at <code>/data</code>. The platform sets <code>PORT</code>. Set <code>CONSOLE_HOST</code> and <code>HS_HOST</code> to the public hostnames.</li>
             </ol>
           </div>
         </details>
@@ -74,7 +88,7 @@
       <section class="section">
         <header data-reveal>
           <h2>Cloud platforms</h2>
-          <p>Numbered steps per host. Compose is native on a VM. Railway and Heroku are not one-blob Compose.</p>
+          <p>Numbered steps per host. Compose is native on a VM. Railway and Render should use the standalone image, not the three-service stack.</p>
         </header>
 
         <details class="platform" data-reveal>
@@ -86,9 +100,9 @@
             <ol class="steps">
               <li>Launch Ubuntu. Security group: TCP 80 and 443 (8080 only if you join from the instance).</li>
               <li>Install Docker Compose on the instance.</li>
-              <li>Copy the stack YAML and env example onto the box (download links above).</li>
+              <li>Clone the repo onto the instance.</li>
               <li>Create Route 53 records for console and Headscale. Set <code>OTTERSCALE_DOMAIN</code>, <code>AUTH_URL</code>, <code>CONSOLE_HOST</code>, <code>HS_HOST</code>.</li>
-              <li><code>docker compose -f otterscale-stack.yaml --env-file .env up -d</code>.</li>
+              <li><code>pnpm deploy:stack</code>.</li>
               <li>This stack’s Caddy uses internal TLS. Put a public proxy in front, or swap Caddy to public certs, if browsers must trust the console.</li>
             </ol>
           </div>
@@ -102,9 +116,9 @@
             <ol class="steps">
               <li>Create a VM. NSG: TCP 80 and 443.</li>
               <li>Attach a data disk and bind Docker volumes there so SQLite and Headscale survive reboot.</li>
-              <li>Install Docker, copy the stack files, fill <code>.env</code>.</li>
+              <li>Install Docker and pnpm, clone the repo, fill <code>.env</code>.</li>
               <li>Point DNS at the VM. Set <code>OTTERSCALE_DOMAIN</code> to the Headscale hostname — do not leave it empty in production.</li>
-              <li><code>docker compose up -d</code>, then <code>/setup</code> and Add device.</li>
+              <li><code>pnpm deploy:stack</code>, then <code>/setup</code> and Add device.</li>
             </ol>
           </div>
         </details>
@@ -117,9 +131,9 @@
             <ol class="steps">
               <li>Create a VM. VPC firewall: allow http and https.</li>
               <li>Reserve a static IP. Create Cloud DNS records for console and Headscale.</li>
-              <li>Install Docker, copy stack + env, set <code>OTTERSCALE_DOMAIN</code>.</li>
+              <li>Install Docker and pnpm, clone the repo, set <code>OTTERSCALE_DOMAIN</code>.</li>
               <li>Keep host <code>:8080</code> on localhost unless TLS terminates elsewhere.</li>
-              <li><code>docker compose up -d</code>. Persistent disk for volumes.</li>
+              <li><code>pnpm deploy:stack</code>. Persistent disk for volumes.</li>
             </ol>
           </div>
         </details>
@@ -131,10 +145,9 @@
           <div class="body">
             <ol class="steps">
               <li>Use Marketplace Docker or a Debian image. Cloud Firewall: 80/443.</li>
-              <li>Download the stack YAML and env example onto the instance.</li>
-              <li>Fill <code>.env</code> (<code>OTTERSCALE_IMAGE_TAG</code> if you pinned a GHCR tag).</li>
+              <li>Clone the repo. Fill <code>.env</code>.</li>
               <li>Linode DNS for <code>CONSOLE_HOST</code> and <code>HS_HOST</code>.</li>
-              <li><code>docker compose -f otterscale-stack.yaml --env-file .env up -d</code>.</li>
+              <li><code>pnpm deploy:stack</code>.</li>
             </ol>
           </div>
         </details>
@@ -145,11 +158,11 @@
           </summary>
           <div class="body">
             <ol class="steps">
-              <li>Preferred: a Render VM that can run Docker Compose with the downloaded stack file.</li>
-              <li>If you split one GHCR image per service, you lose the secrets volume.</li>
-              <li>Mint keys once: <code>headscale apikeys create</code> and a <code>tag:edge</code> pre-auth key.</li>
-              <li>Paste <code>HEADSCALE_API_KEY</code> and <code>APPS_EDGE_AUTHKEY</code> into each service.</li>
-              <li>Set <code>OTTERSCALE_DOMAIN</code> to Render’s public Headscale HTTPS origin (matches Headscale <code>server_url</code>).</li>
+              <li>Preferred: one web service from <code>ghcr.io/robosushie/otterscale/standalone</code> (or Dockerfile <code>deployment/standalone/Dockerfile</code>).</li>
+              <li>Attach a persistent disk at <code>/data</code>. Render sets <code>PORT</code>; Caddy listens there.</li>
+              <li>Set <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> to the public HTTPS hostnames.</li>
+              <li>A Render VM with Docker and pnpm can run <code>pnpm deploy:stack</code> instead.</li>
+              <li>If you split one GHCR image per service, you lose the secrets volume and must mint keys by hand.</li>
             </ol>
           </div>
         </details>
@@ -160,12 +173,11 @@
           </summary>
           <div class="body">
             <ol class="steps">
-              <li>Do not run this Compose file inside one empty Railway service. There is no shared volume.</li>
-              <li>Create three services from GHCR: <code>app</code>, <code>edge</code>, <code>headscale</code>.</li>
-              <li>Private DNS: <code>http://headscale.railway.internal:8080</code> as <code>HEADSCALE_INTERNAL_URL</code>.</li>
-              <li>Volume on Headscale and on the app (SQLite).</li>
-              <li>One-off on Headscale: <code>apikeys create</code> and <code>preauthkeys create --tags tag:edge</code>. Set those vars on app and edge.</li>
-              <li>Attach a public HTTPS domain to Headscale. Set <code>OTTERSCALE_DOMAIN</code> to that origin. No inbound UDP for your own DERP.</li>
+              <li>One service from <code>ghcr.io/robosushie/otterscale/standalone</code> (or Dockerfile <code>deployment/standalone/Dockerfile</code>).</li>
+              <li>Volume at <code>/data</code>. Railway sets <code>PORT</code>; do not run the three-service Compose file here.</li>
+              <li>Set <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> to the public HTTPS domains on that service.</li>
+              <li>Bootstrap inside the container mints API keys onto the disk. No inbound UDP for your own DERP.</li>
+              <li>Split <code>app</code> / <code>edge</code> / <code>headscale</code> only if you need separate services; then mint keys by hand and use private DNS.</li>
             </ol>
           </div>
         </details>
@@ -176,9 +188,9 @@
           </summary>
           <div class="body">
             <ol class="steps">
-              <li>Heroku is not a Compose host and does not share volumes. This YAML will not run there.</li>
+              <li>Heroku is not a Compose host and does not share volumes.</li>
               <li>Use a cloud VM (EC2, Lightsail, Linode) for Headscale + edge + app instead.</li>
-              <li>Download the stack file and follow Generic Docker host.</li>
+              <li>Clone the repo and run <code>pnpm deploy:stack</code>.</li>
             </ol>
           </div>
         </details>
@@ -191,7 +203,7 @@
             <ol class="steps">
               <li>GitHub → Actions → Publish GHCR.</li>
               <li>Pick the branch. Enter a tag such as <code>0.1.0</code> or <code>dev</code>.</li>
-              <li>That pushes <code>ghcr.io/robosushie/otterscale/{app,edge,headscale}</code>.</li>
+              <li>That pushes <code>ghcr.io/robosushie/otterscale/{app,edge,headscale,standalone}</code>.</li>
               <li>Semver tags also move <code>latest</code>. Override with <code>OTTERSCALE_IMAGE_TAG</code>.</li>
               <li>If packages stay private, open Packages once and set visibility to public.</li>
             </ol>

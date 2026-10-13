@@ -16,20 +16,26 @@ jobs:
   publish:
     name: Build and push ${{ matrix.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: app
-            file: deploy/Dockerfile
+            file: deployment/app/Dockerfile
+            context: .
+          - name: core
+            file: deployment/core/Dockerfile
             context: .
           - name: edge
-            file: deploy/edge/Dockerfile
+            file: deployment/edge/Dockerfile
             context: .
           - name: headscale
-            file: deploy/headscale/Dockerfile
-            context: deploy/headscale
+            file: deployment/headscale/Dockerfile
+            context: deployment/headscale
+          - name: standalone
+            file: deployment/standalone/Dockerfile
+            context: .
     steps:
       - uses: actions/checkout@v4
 
