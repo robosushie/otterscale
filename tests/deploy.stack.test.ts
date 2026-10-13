@@ -70,7 +70,10 @@ describe("local stack compose", () => {
     expect(workflow).toContain("name: core");
     expect(workflow).toContain("name: edge");
     expect(workflow).toContain("name: headscale");
-    expect(workflow).toContain("visibility=public");
+    expect(workflow).toContain('{"visibility":"public"}');
+    expect(workflow).toContain("api.github.com");
+    expect(workflow).toContain("urllib.parse.quote");
+    expect(workflow).not.toContain("gh api");
     expect(workflow).not.toContain("continue-on-error");
     expect(workflow).toContain("site/releases.json");
   });
