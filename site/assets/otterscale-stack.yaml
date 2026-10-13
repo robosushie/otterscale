@@ -1,0 +1,130 @@
+# Otterscale stack — GHCR images (headscale, core, app, edge).
+# Multi-container deploy for a VM with Docker Compose.
+#
+#   cp deployment/otterscale-stack.env.example .env
+#   docker compose -f deployment/otterscale-stack.yaml --env-file .env up -d
+#
+# Init mints HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY onto otterscale_secrets.
+# Do not set those in .env. Pin AUTH_SECRET. Set OTTERSCALE_IMAGE_TAG to a published tag.
+# pnpm deploy:stack builds from this repo and does not read OTTERSCALE_IMAGE_TAG.
+# Config, policy, and the Caddyfile are baked into the images.
+
+name: otterscale
+
+services:
+  headscale:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/headscale:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: headscale
+    hostname: headscale
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      OTTERSCALE_DOMAIN: ${OTTERSCALE_DOMAIN:-}
+    volumes:
+      - headscale_data:/var/lib/headscale
+      - headscale_run:/var/run/headscale
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  init:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/headscale:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: otterscale-init
+    hostname: init
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to a random string of at least 32 characters}
+      HEADSCALE_USER: tagged-devices
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+    volumes:
+      - headscale_run:/var/run/headscale
+      - otterscale_secrets:/otterscale-secrets
+    entrypoint: ["/bootstrap.sh"]
+    restart: on-failure
+    depends_on:
+      headscale:
+        condition: service_healthy
+
+  core:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/core:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: core
+    hostname: core
+    environment:
+      CORE_ADDR: ":4000"
+      OTTERSCALE_DATA_DIR: /data
+      DATABASE_URL: ${DATABASE_URL:-}
+      AUTH_URL: ${AUTH_URL:-https://console.localhost}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to a random string of at least 32 characters}
+      AUTH_OIDC_ISSUER: ${AUTH_OIDC_ISSUER:-}
+      AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-}
+      AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-}
+      AUTH_SETUP_TOKEN: ${AUTH_SETUP_TOKEN:-}
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+      HEADSCALE_PUBLIC_URL: ${HEADSCALE_PUBLIC_URL:-https://hs.localhost}
+      OTTERSCALE_DOMAIN: ${OTTERSCALE_DOMAIN:-}
+      HEADSCALE_API_KEY: ""
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      APPS_PROBE_URL: http://edge:4180
+    volumes:
+      - otterscale_data:/data
+      - apps_caddy_config:/data/apps-caddy
+      - otterscale_secrets:/otterscale-secrets:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  app:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/app:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: app
+    hostname: app
+    restart: unless-stopped
+
+  edge:
+    image: ${OTTERSCALE_IMAGE_PREFIX:-ghcr.io/robosushie/otterscale}/edge:${OTTERSCALE_IMAGE_TAG:-latest}
+    container_name: edge
+    hostname: edge
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      HEADSCALE_INTERNAL_URL: http://headscale:8080
+      APPS_EDGE_AUTHKEY: ""
+      CONSOLE_HOST: ${CONSOLE_HOST:-console.localhost}
+      HS_HOST: ${HS_HOST:-hs.localhost}
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
+      APPS_ROUTES_PATH: /data/apps-caddy/routes.json
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_HOSTNAME: edge
+      LISTEN_ADDR: 127.0.0.1:8081
+      PROBE_ADDR: :4180
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - apps_proxy_state:/var/lib/tailscale
+      - apps_caddy_config:/data/apps-caddy
+      - otterscale_secrets:/otterscale-secrets:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4180/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  headscale_data:
+  headscale_run:
+  otterscale_data:
+  otterscale_secrets:
+  caddy_data:
+  caddy_config:
+  apps_caddy_config:
+  apps_proxy_state:

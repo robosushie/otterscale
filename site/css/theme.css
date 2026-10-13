@@ -235,6 +235,7 @@ a {
   text-transform: uppercase;
   text-decoration: none;
   border: 1px solid transparent;
+  cursor: pointer;
 }
 
 .btn-primary {
@@ -339,14 +340,142 @@ details.platform summary {
   font-size: 14px;
 }
 
+.file-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.file-row code {
+  font-size: 13px;
+  margin-right: auto;
+}
+
+.pull-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pull-list li {
+  margin-top: 8px;
+}
+
+.pull-list code {
+  font-size: 13px;
+}
+
+.release-current {
+  background: var(--color-periwinkle-mist);
+  border: 1px solid var(--color-off-black);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.release-current h3 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 400;
+  margin-top: 8px;
+}
+
+.image-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.release-older {
+  margin-top: 16px;
+  border: 1px solid var(--color-ash);
+  border-radius: 8px;
+  background: var(--color-paper);
+  padding: 0 20px;
+}
+
+.release-older > summary,
+.release-older details summary {
+  cursor: pointer;
+  padding: 16px 0;
+}
+
+.release-older > summary {
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.release-older details {
+  border-top: 1px solid var(--color-ash);
+}
+
+.release-older details ul {
+  margin-bottom: 16px;
+}
+
 .arch {
   position: relative;
 }
 
-.arch svg {
+.arch-board {
+  position: relative;
+  width: 980px;
+  height: 640px;
+  margin: 0 auto;
+  user-select: none;
+}
+
+.arch-wires {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  pointer-events: none;
+}
+
+.arch-card {
+  position: absolute;
+  width: 200px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-ash);
+  border-radius: 8px;
+  background: var(--color-paper);
+  color: var(--color-off-black);
+  text-align: left;
+  cursor: default;
+  font: inherit;
+}
+
+.arch-card:hover,
+.arch-card:focus-visible,
+.arch-card.is-on {
+  background: var(--color-periwinkle-mist);
+  border-color: var(--color-off-black);
+  outline: none;
+}
+
+.arch-title {
   display: block;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.arch-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-smoke);
 }
 
 .arch-caption {
@@ -356,38 +485,28 @@ details.platform summary {
   min-height: 2.7em;
 }
 
-.arch-node {
-  cursor: pointer;
-}
-
-.arch-node rect {
-  fill: var(--color-paper);
-  stroke: var(--color-ash);
-  transition: fill 0.2s ease, stroke 0.2s ease;
-}
-
-.arch-node.is-on rect,
-.arch-node:hover rect,
-.arch-node:focus-visible rect {
-  fill: var(--color-periwinkle-mist);
-  stroke: var(--color-off-black);
-}
-
-.arch-node text {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  fill: var(--color-off-black);
-}
-
 .arch-edge {
   stroke: var(--color-ash);
   stroke-width: 1.5;
   fill: none;
-  transition: stroke 0.2s ease;
+  stroke-dasharray: 6 8;
+  animation: arch-flow 1.1s linear infinite;
 }
 
 .arch-edge.is-on {
   stroke: var(--color-off-black);
+}
+
+@keyframes arch-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arch-edge {
+    animation: none;
+  }
 }
 
 details.platform summary::-webkit-details-marker {

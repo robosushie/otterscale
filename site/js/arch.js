@@ -2,85 +2,134 @@
   const host = document.querySelector("[data-arch]");
   if (!host) return;
 
+  const cardW = 200;
+  const cardH = 72;
   const nodes = [
-    { id: "browser", x: 28, y: 36, label: "Browser" },
-    { id: "clients", x: 28, y: 200, label: "Tailscale clients" },
-    { id: "edge", x: 280, y: 118, label: "edge Caddy + tsnet" },
-    { id: "console", x: 532, y: 36, label: "Console" },
-    { id: "hs", x: 532, y: 200, label: "Headscale" },
-    { id: "mesh", x: 760, y: 118, label: "Mesh 100.x" },
+    { id: "browser", title: "Browser", sub: "Console UI", x: 40, y: 24 },
+    { id: "clients", title: "Tailscale clients", sub: "Official apps", x: 740, y: 24 },
+    { id: "edge", title: "Edge", sub: "Caddy and tsnet", x: 390, y: 168 },
+    { id: "console", title: "Console", sub: "Static Vite app", x: 40, y: 340 },
+    { id: "core", title: "Core", sub: "Go API", x: 390, y: 340 },
+    { id: "hs", title: "Headscale", sub: "Coordination", x: 740, y: 340 },
+    { id: "mesh", title: "Mesh", sub: "Published apps", x: 180, y: 530 },
+    { id: "data", title: "Data", sub: "SQLite or Postgres", x: 600, y: 530 },
   ];
-  const edges = [
-    ["browser", "edge"],
-    ["clients", "hs"],
-    ["edge", "console"],
-    ["edge", "hs"],
-    ["edge", "mesh"],
-    ["console", "hs"],
+  const links = [
+    ["browser", "edge", "bottom", "top", -36],
+    ["clients", "edge", "bottom", "top", 36],
+    ["edge", "console", "bottom", "top", -48],
+    ["edge", "core", "bottom", "top", 0],
+    ["edge", "hs", "bottom", "top", 48],
+    ["edge", "mesh", "bottom", "top", -70],
+    ["core", "hs", "right", "left", 0],
+    ["core", "data", "bottom", "top", -28],
+    ["hs", "data", "bottom", "top", 28],
   ];
   const copy = {
-    browser: "The console UI reaches Headscale through edge TLS, not from the laptop loopback.",
-    clients: "Official Tailscale clients speak the login-server — local HTTP or OTTERSCALE_DOMAIN.",
-    edge: "Caddy terminates TLS. A Go tsnet hop reverse-proxies Network Apps onto mesh IPs.",
-    console: "Next.js issues keys, compiles policy, and writes routes.json for edge.",
-    hs: "Headscale is the coordination engine. One process per tailnet.",
-    mesh: "Peers talk 100.64.0.0/10. This hop is not Funnel.",
+    browser: "The browser opens the console through edge TLS. API calls stay on the same host.",
+    clients:
+      "Official Tailscale apps use the login server. Locally that is http://127.0.0.1:8080. In production it is OTTERSCALE_DOMAIN.",
+    edge: "Caddy terminates TLS for the console, Headscale, and published apps. The tsnet process joins as hostname edge with tag:edge. Init mints that key onto the secrets volume.",
+    console: "The Vite app is static files. It talks to the Go API on /api and listens on /api/live.",
+    core: "Core owns sessions, workspaces, policy, audit, and machine keys. It calls the Headscale API and writes routes.json for edge.",
+    hs: "Headscale is the coordination engine, one process for this tailnet. It keeps its own SQLite state. This is not Funnel.",
+    data: "An empty DATABASE_URL creates /data/otterscale.db. postgres:// uses Postgres. Headscale state stays in its own SQLite file.",
+    mesh: "Published apps are reached on 100.64.0.0/10 through the edge node. This hop is not Funnel.",
   };
+  const idle =
+    "Hover a box. Init mints Headscale keys onto the secrets volume. Edge joins as tag:edge. Published apps use the mesh, not Funnel.";
 
-  function xy(id) {
-    const n = nodes.find((item) => item.id === id);
-    return { x: n.x + 96, y: n.y + 22 };
+  function byId(id) {
+    return nodes.find((node) => node.id === id);
   }
 
-  const edgeMarkup = edges
-    .map(([a, b]) => {
-      const p = xy(a);
-      const q = xy(b);
-      return `<path class="arch-edge" data-a="${a}" data-b="${b}" d="M${p.x} ${p.y} L${q.x} ${q.y}" />`;
+  function port(node, side, nudge) {
+    const x = node.x;
+    const y = node.y;
+    if (side === "top") return { x: x + cardW / 2 + nudge, y: y };
+    if (side === "bottom") return { x: x + cardW / 2 + nudge, y: y + cardH };
+    if (side === "left") return { x: x, y: y + cardH / 2 + nudge };
+    return { x: x + cardW, y: y + cardH / 2 + nudge };
+  }
+
+  function curve(a, b, from, to) {
+    const horizontal = from === "left" || from === "right" || to === "left" || to === "right";
+    if (horizontal && Math.abs(a.y - b.y) < 8) {
+      const mid = (a.x + b.x) / 2;
+      return "M" + a.x + " " + a.y + " C" + mid + " " + a.y + ", " + mid + " " + b.y + ", " + b.x + " " + b.y;
+    }
+    const mid = (a.y + b.y) / 2;
+    return "M" + a.x + " " + a.y + " C" + a.x + " " + mid + ", " + b.x + " " + mid + ", " + b.x + " " + b.y;
+  }
+
+  const edgeMarkup = links
+    .map(([fromId, toId, fromSide, toSide, nudge]) => {
+      const start = port(byId(fromId), fromSide, 0);
+      const end = port(byId(toId), toSide, nudge);
+      return (
+        '<path class="arch-edge" data-a="' +
+        fromId +
+        '" data-b="' +
+        toId +
+        '" d="' +
+        curve(start, end, fromSide, toSide) +
+        '" />'
+      );
     })
     .join("");
 
-  const nodeMarkup = nodes
+  const cardMarkup = nodes
     .map(
-      (n) => `
-      <g class="arch-node" data-id="${n.id}" tabindex="0" role="button" aria-label="${n.label}">
-        <rect x="${n.x}" y="${n.y}" width="192" height="44" rx="8" />
-        <text x="${n.x + 16}" y="${n.y + 27}">${n.label}</text>
-      </g>`,
+      (node) =>
+        '<button type="button" class="arch-card" data-id="' +
+        node.id +
+        '" style="left:' +
+        node.x +
+        "px;top:" +
+        node.y +
+        'px" aria-label="' +
+        node.title +
+        ", " +
+        node.sub +
+        '"><span class="arch-title">' +
+        node.title +
+        '</span><span class="arch-sub">' +
+        node.sub +
+        "</span></button>",
     )
     .join("");
 
-  host.innerHTML = `
-    <svg viewBox="0 0 980 280" role="img" aria-label="Otterscale architecture">
-      ${edgeMarkup}
-      ${nodeMarkup}
-    </svg>
-    <p class="arch-caption" data-arch-caption>Hover a node. Browser and clients enter at the edge; the console talks to Headscale; apps land on the mesh.</p>
-  `;
+  host.innerHTML =
+    '<div class="arch-board">' +
+    '<svg class="arch-wires" viewBox="0 0 980 640" role="img" aria-label="Otterscale architecture">' +
+    edgeMarkup +
+    "</svg>" +
+    cardMarkup +
+    "</div>" +
+    '<p class="arch-caption" data-arch-caption>' +
+    idle +
+    "</p>";
 
   const caption = host.querySelector("[data-arch-caption]");
-  const nodeEls = host.querySelectorAll(".arch-node");
-  const edgeEls = host.querySelectorAll(".arch-edge");
+  const cards = host.querySelectorAll(".arch-card");
+  const edges = host.querySelectorAll(".arch-edge");
 
   function setActive(id) {
-    nodeEls.forEach((el) => el.classList.toggle("is-on", el.getAttribute("data-id") === id));
-    edgeEls.forEach((el) => {
+    cards.forEach((el) => el.classList.toggle("is-on", el.getAttribute("data-id") === id));
+    edges.forEach((el) => {
       const on = el.getAttribute("data-a") === id || el.getAttribute("data-b") === id;
       el.classList.toggle("is-on", on);
     });
-    if (caption && id) caption.textContent = copy[id];
+    if (caption) caption.textContent = copy[id];
   }
 
   function clear() {
-    nodeEls.forEach((el) => el.classList.remove("is-on"));
-    edgeEls.forEach((el) => el.classList.remove("is-on"));
-    if (caption) {
-      caption.textContent =
-        "Hover a node. Browser and clients enter at the edge; the console talks to Headscale; apps land on the mesh.";
-    }
+    cards.forEach((el) => el.classList.remove("is-on"));
+    edges.forEach((el) => el.classList.remove("is-on"));
+    if (caption) caption.textContent = idle;
   }
 
-  nodeEls.forEach((el) => {
+  cards.forEach((el) => {
     const id = el.getAttribute("data-id");
     el.addEventListener("pointerenter", () => setActive(id));
     el.addEventListener("focus", () => setActive(id));

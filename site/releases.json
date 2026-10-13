@@ -1,0 +1,9 @@
+{
+  "latest": null,
+  "previous": null,
+  "history": [],
+  "sha": null,
+  "prefix": "ghcr.io/robosushie/otterscale",
+  "standalone": ["standalone"],
+  "stack": ["headscale", "core", "app", "edge"]
+}

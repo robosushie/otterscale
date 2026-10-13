@@ -249,9 +249,16 @@ pnpm deploy:stack --keep-data
 
 The default deletes this project's volumes. `--keep-data` reuses them. It does not touch the standalone project's volumes.
 
-Set `OTTERSCALE_DOMAIN` (and `AUTH_URL`) whenever TLS sits in front of Headscale. Local default login-server remains `http://127.0.0.1:8080`. Platform notes live on the [GitHub Pages deploy page](https://robosushie.github.io/otterscale/deploy.html). Railway and Render should use the standalone image, not this Compose file.
+`pnpm deploy:stack` builds locally and does not read `OTTERSCALE_IMAGE_TAG`. A VM that should pull published images uses [`deployment/otterscale-stack.yaml`](../deployment/otterscale-stack.yaml):
 
-Publish images with **Actions → Publish GHCR** (select branch, input tag).
+```bash
+cp deployment/otterscale-stack.env.example .env
+docker compose -f deployment/otterscale-stack.yaml --env-file .env up -d
+```
+
+Set `OTTERSCALE_IMAGE_TAG` to the tag from **Actions → Publish GHCR**. Unset, Compose pulls `latest`. Publishing that tag again replaces the images. A semver tag also moves Docker's `latest`. Images are `ghcr.io/robosushie/otterscale/{headscale,core,app,edge}`. Init uses the headscale image. Do not set `HEADSCALE_API_KEY`, `APPS_EDGE_AUTHKEY`, or `HEADSCALE_INTERNAL_URL` in that `.env`.
+
+Set `OTTERSCALE_DOMAIN` (and `AUTH_URL`) whenever TLS sits in front of Headscale. Local default login-server remains `http://127.0.0.1:8080`. Platform notes live on the [GitHub Pages deployment page](https://robosushie.github.io/otterscale/deployment.html). Railway, Render, and the other one-container hosts should use the standalone image, not this Compose file.
 
 ---
 
@@ -266,12 +273,14 @@ pnpm deploy:standalone
 pnpm deploy:standalone --keep-data
 ```
 
-Pull on a VM (`down -v` for a fresh disk; omit `-v` to keep it):
+`pnpm deploy:standalone` builds locally and does not read `OTTERSCALE_IMAGE_TAG`. Pull on a VM (`down -v` for a fresh disk; omit `-v` to keep it):
 
 ```bash
 cp deployment/otterscale-standalone.env.example .env
 docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d
 ```
+
+`OTTERSCALE_IMAGE_TAG` selects `ghcr.io/robosushie/otterscale/standalone`. Unset, Compose pulls `latest`.
 
 Caddy listens on 80/443 with internal TLS when `PORT` is unset. Railway and Render set `PORT`; Caddy then serves HTTP on that port and the platform terminates TLS. Headscale listens on `0.0.0.0:18080` so a published host port can reach it without taking `PORT`. In-container clients use `http://127.0.0.1:18080`. Local login-server remains `http://127.0.0.1:8080` (host `127.0.0.1:8080` → container `18080`).
 
@@ -286,12 +295,13 @@ Set `AUTH_URL`, `OTTERSCALE_DOMAIN`, `CONSOLE_HOST`, and `HS_HOST` to the public
 - Prefer the **standalone** image (`deployment/standalone/Dockerfile` or `ghcr.io/robosushie/otterscale/standalone`) as one service with a persistent disk on `/data` (keys live in `/data/secrets`)
 - Set `AUTH_SECRET`, `AUTH_URL`, `OTTERSCALE_DOMAIN`, `CONSOLE_HOST`, and `HS_HOST`; the platform sets `PORT`. Leave Headscale API keys unset
 - TCP proxy; **no inbound UDP** → DERP on an external VM
-- Do not run the multi-container Compose file as one Railway service (no shared volumes). Use `pnpm deploy:stack` on a VM.
+- Do not run `otterscale-stack.yaml` as one Railway service (no shared volumes). On a VM, pull with that file or run `pnpm deploy:stack`.
 
 ### AWS
 
-- RDS Postgres; ECS/Fargate for platform; EC2 or ECS on EC2 for tenants needing predictable networking
-- Security group: UDP 3478 for DERP instances
+- EC2: `otterscale-stack.yaml` or `otterscale-standalone.yaml`, security group TCP 80 and 443
+- App Runner and Lightsail Containers cannot keep `/data`
+- UDP 3478 for your own DERP belongs on a VM security group
 
 ### Single-org homelab
 

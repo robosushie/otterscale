@@ -8,15 +8,14 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
   publish:
     name: Build and push ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -54,9 +53,14 @@ jobs:
           set -euo pipefail
           TAG="${{ inputs.tag }}"
           TAG="${TAG#v}"
+          if [[ ! "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Tag must be letters, numbers, dots, underscores, or hyphens" >&2
+            exit 1
+          fi
           SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
           IMAGE="ghcr.io/${{ github.repository }}/${{ matrix.name }}"
           IMAGE="${IMAGE,,}"
+          # Pushing an existing tag moves it onto this digest.
           TAGS="${IMAGE}:${TAG},${IMAGE}:${TAG}-${SHA}"
           if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             TAGS="${TAGS},${IMAGE}:latest"
@@ -75,19 +79,99 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Make package public
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE: ${{ steps.meta.outputs.package }}
         run: |
           set -euo pipefail
-          encoded="$(printf '%s' '${{ steps.meta.outputs.package }}' | jq -sRr @uri)"
+          encoded="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["PACKAGE"], safe=""))')"
           owner="${{ github.repository_owner }}"
           if [ "${{ github.event.repository.owner.type }}" = "Organization" ]; then
-            gh api --method POST -H "Accept: application/vnd.github+json" \
-              "/orgs/${owner}/packages/container/${encoded}/visibility" \
-              -f visibility=public
+            url="/orgs/${owner}/packages/container/${encoded}/visibility"
           else
-            gh api --method POST -H "Accept: application/vnd.github+json" \
-              "/user/packages/container/${encoded}/visibility" \
-              -f visibility=public
+            url="/user/packages/container/${encoded}/visibility"
           fi
+          set +e
+          body="$(gh api --method POST -H "Accept: application/vnd.github+json" "$url" -f visibility=public 2>&1)"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            case "$body" in
+              *[Aa]lready*|*"not updated"*)
+                echo "Package already public"
+                ;;
+              *)
+                printf '%s\n' "$body" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+  site:
+    name: Record tag and deploy Pages
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update site/releases.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          TAG="${TAG#v}"
+          SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+          PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
+          current="$(jq -r '.latest // empty' site/releases.json)"
+          if [ "$current" = "$TAG" ]; then
+            jq --arg tag "$TAG" --arg sha "$SHA" --arg prefix "$PREFIX" \
+              '.latest = $tag | .sha = $sha | .prefix = $prefix' \
+              site/releases.json > site/releases.json.tmp
+          else
+            jq --arg tag "$TAG" --arg sha "$SHA" --arg prefix "$PREFIX" --arg prev "$current" \
+              '.previous = (if $prev == "" then .previous else $prev end) | .history = (if $prev == "" then (.history // []) else ([$prev] + ((.history // []) | map(select(. != $prev and . != $tag)))) end) | .latest = $tag | .sha = $sha | .prefix = $prefix' \
+              site/releases.json > site/releases.json.tmp
+          fi
+          mv site/releases.json.tmp site/releases.json
+
+      - name: Copy pull files
+        run: |
+          mkdir -p site/assets
+          cp deployment/otterscale-standalone.yaml site/assets/otterscale-standalone.yaml
+          cp deployment/otterscale-standalone.env.example site/assets/otterscale-standalone.env.example
+          cp deployment/otterscale-stack.yaml site/assets/otterscale-stack.yaml
+          cp deployment/otterscale-stack.env.example site/assets/otterscale-stack.env.example
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Commit published tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/releases.json
+          if git diff --cached --quiet; then
+            echo "releases.json unchanged"
+            exit 0
+          fi
+          git commit -m "chore(site): record GHCR tag ${{ inputs.tag }}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

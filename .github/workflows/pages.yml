@@ -7,6 +7,8 @@ on:
       - "site/**"
       - "deployment/otterscale-standalone.yaml"
       - "deployment/otterscale-standalone.env.example"
+      - "deployment/otterscale-stack.yaml"
+      - "deployment/otterscale-stack.env.example"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -28,11 +30,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy Otterscale standalone assets
+      - name: Copy Otterscale pull files
         run: |
           mkdir -p site/assets
           cp deployment/otterscale-standalone.yaml site/assets/otterscale-standalone.yaml
           cp deployment/otterscale-standalone.env.example site/assets/otterscale-standalone.env.example
+          cp deployment/otterscale-stack.yaml site/assets/otterscale-stack.yaml
+          cp deployment/otterscale-stack.env.example site/assets/otterscale-stack.env.example
 
       - uses: actions/configure-pages@v5
         with:

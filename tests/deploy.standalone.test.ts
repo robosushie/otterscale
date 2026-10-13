@@ -62,7 +62,9 @@ describe("Otterscale standalone", () => {
     expect(entrypoint).not.toContain("listen_addr: 127.0.0.1:18080");
     expect(compose).toContain('APPS_EDGE_AUTHKEY: ""');
     expect(compose).not.toContain("APPS_EDGE_AUTHKEY: ${");
-    expect(pull).toContain("ghcr.io/robosushie/otterscale}/standalone:");
+    expect(pull).toContain("ghcr.io/robosushie/otterscale}/standalone:${OTTERSCALE_IMAGE_TAG:-latest}");
+    expect(pull).toContain("DATABASE_URL: ${DATABASE_URL:-file:/data/otterscale.db}");
+    expect(compose).not.toContain("OTTERSCALE_IMAGE_TAG");
     expect(pull).toContain("HEADSCALE_INTERNAL_URL: http://127.0.0.1:18080");
     expect(pull).not.toContain("HEADSCALE_API_KEY:");
     expect(pull).not.toContain("APPS_EDGE_AUTHKEY:");

@@ -19,7 +19,7 @@ Self-hosted team mesh control. No per-seat lock-in. A console on [Headscale](htt
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square)](https://www.sqlite.org/)
 [![GHCR](https://img.shields.io/badge/GHCR-app%20%7C%20core%20%7C%20edge%20%7C%20headscale%20%7C%20standalone-2496ED?style=flat-square)](https://github.com/robosushie/otterscale/pkgs/container/otterscale%2Fapp)
 
-**Website:** [robosushie.github.io/otterscale](https://robosushie.github.io/otterscale/) — [features](https://robosushie.github.io/otterscale/features.html) · [deploy](https://robosushie.github.io/otterscale/deploy.html)
+**Website:** [robosushie.github.io/otterscale](https://robosushie.github.io/otterscale/) — [features](https://robosushie.github.io/otterscale/features.html) · [deploy](https://robosushie.github.io/otterscale/deployment.html)
 
 **Docs:** [docs/README.md](./docs/README.md) · [architecture](./docs/architecture.md) · [deployment](./docs/deployment.md) · [theme](./docs/theme.md)
 
@@ -117,9 +117,16 @@ Do not put `HEADSCALE_API_KEY` or `APPS_EDGE_AUTHKEY` in `.env`. `APPS_EDGE_AUTH
 
 ## Production (GHCR)
 
-Multi-container hosts use `pnpm deploy:stack` (builds from this repo). One-container hosts pull the standalone image:
+`pnpm deploy:stack` and `pnpm deploy:standalone` build from this repo. They do not read `OTTERSCALE_IMAGE_TAG`.
 
-Images: `ghcr.io/robosushie/otterscale/{app,edge,headscale,standalone}`. Default tag is `latest`. Semver tags from **Actions → Publish GHCR** also move `latest`. Set `OTTERSCALE_DOMAIN` and `AUTH_URL` in production. Pin `AUTH_SECRET`. The init container (stack) or the standalone entrypoint mints Headscale keys onto that product's volume.
+Published images: `ghcr.io/robosushie/otterscale/{headscale,core,app,edge,standalone}`. Set `OTTERSCALE_IMAGE_TAG` to the tag from **Actions → Publish GHCR**. Unset, the pull files use `latest`. A semver tag also moves the Docker tag `latest`. Publishing the same tag again replaces those images. Pin `AUTH_SECRET`. Set `OTTERSCALE_DOMAIN` and `AUTH_URL`. The init container (stack) or the standalone entrypoint mints Headscale keys onto that product's volume.
+
+Multi-container pull:
+
+```bash
+cp deployment/otterscale-stack.env.example .env
+docker compose -f deployment/otterscale-stack.yaml --env-file .env up -d
+```
 
 One-container pull:
 
@@ -128,9 +135,7 @@ cp deployment/otterscale-standalone.env.example .env
 docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d
 ```
 
-If pulls return 401, open **Packages** for `app`, `edge`, `headscale`, and `standalone` and set visibility to public.
-
-Platform notes (cloud VMs, Railway, Heroku): [deploy page](https://robosushie.github.io/otterscale/deploy.html).
+Platform notes: [deployment page](https://robosushie.github.io/otterscale/deployment.html).
 
 ## Configuration
 
@@ -148,6 +153,8 @@ Never commit `.env`. Copy from [`.env.example`](./.env.example).
 | `HEADSCALE_INTERNAL_URL` | Docker | App → Headscale (`http://headscale:8080`) |
 | `HEADSCALE_PUBLIC_URL` | Docker | Public Headscale URL |
 | `OTTERSCALE_DOMAIN` | Production | Login-server for Add device (HTTPS). Unset → `http://127.0.0.1:8080` |
+| `OTTERSCALE_IMAGE_TAG` | Production pull | GHCR tag for `otterscale-stack.yaml` and `otterscale-standalone.yaml`. Ignored by `pnpm deploy:stack` and `pnpm deploy:standalone` |
+| `OTTERSCALE_IMAGE_PREFIX` | Optional | Registry prefix. Default `ghcr.io/robosushie/otterscale` |
 | `APPS_BASE_DOMAIN` | Optional | Network Apps hostname suffix (default `apps.localhost`) |
 
 ## Development
@@ -163,7 +170,8 @@ Prereqs: Node 22, pnpm 10.12.1, [Go 1.25](./packages/core/go.mod), Docker for th
 | `pnpm deploy:stack --keep-data` | Rebuild stack on existing volumes |
 | `pnpm deploy:standalone` | Wipe standalone volume, build, and run |
 | `pnpm deploy:standalone --keep-data` | Rebuild standalone on existing volume |
-| `docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d` | Pull GHCR standalone image |
+| `docker compose -f deployment/otterscale-stack.yaml --env-file .env up -d` | Pull GHCR stack images (`OTTERSCALE_IMAGE_TAG`) |
+| `docker compose -f deployment/otterscale-standalone.yaml --env-file .env up -d` | Pull GHCR standalone image (`OTTERSCALE_IMAGE_TAG`) |
 
 Schema changes are goose SQL under `packages/core/migrations`. Core applies them on startup.
 

@@ -70,5 +70,25 @@ describe("local stack compose", () => {
     expect(workflow).toContain("name: core");
     expect(workflow).toContain("name: edge");
     expect(workflow).toContain("name: headscale");
+    expect(workflow).toContain("visibility=public");
+    expect(workflow).not.toContain("continue-on-error");
+    expect(workflow).toContain("site/releases.json");
+  });
+
+  it("pulls GHCR images by OTTERSCALE_IMAGE_TAG without building", () => {
+    const pull = readFileSync(resolve(process.cwd(), "deployment/otterscale-stack.yaml"), "utf8");
+    expect(pull).not.toContain("\n    build:");
+    expect(pull).not.toContain("./Caddyfile");
+    expect(pull).not.toContain("./headscale/config.yaml");
+    expect(pull).toContain("/headscale:${OTTERSCALE_IMAGE_TAG:-latest}");
+    expect(pull).toContain("/core:${OTTERSCALE_IMAGE_TAG:-latest}");
+    expect(pull).toContain("/app:${OTTERSCALE_IMAGE_TAG:-latest}");
+    expect(pull).toContain("/edge:${OTTERSCALE_IMAGE_TAG:-latest}");
+    expect(pull).toContain('HEADSCALE_API_KEY: ""');
+    expect(pull).toContain('APPS_EDGE_AUTHKEY: ""');
+    expect(pull).toContain("http://headscale:8080");
+    expect(pull).toContain('entrypoint: ["/bootstrap.sh"]');
+    expect(compose).toContain("\n    build:");
+    expect(compose).not.toContain("OTTERSCALE_IMAGE_TAG");
   });
 });
