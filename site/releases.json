@@ -1,9 +1,16 @@
 {
-  "latest": null,
+  "latest": "0.1.0",
   "previous": null,
   "history": [],
-  "sha": null,
+  "sha": "5b4ab2f",
   "prefix": "ghcr.io/robosushie/otterscale",
-  "standalone": ["standalone"],
-  "stack": ["headscale", "core", "app", "edge"]
+  "standalone": [
+    "standalone"
+  ],
+  "stack": [
+    "headscale",
+    "core",
+    "app",
+    "edge"
+  ]
 }
