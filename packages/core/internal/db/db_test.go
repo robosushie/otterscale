@@ -24,9 +24,14 @@ func TestParsePostgresAndSQLite(t *testing.T) {
 	if err != nil || pg.dialect != "postgres" {
 		t.Fatalf("postgres: %+v %v", pg, err)
 	}
-	file, err := Parse("file:/data/otterscale.db", "")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "otterscale.db")
+	file, err := Parse("file:"+filepath.ToSlash(path), "")
 	if err != nil || file.dialect != "sqlite" {
 		t.Fatalf("file: %+v %v", file, err)
+	}
+	if !contains(file.dsn, filepath.ToSlash(path)) {
+		t.Fatalf("dsn %s", file.dsn)
 	}
 	if _, err := Parse("mysql://localhost/otter", ""); err == nil {
 		t.Fatal("mysql should fail")
