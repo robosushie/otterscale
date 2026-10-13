@@ -5,13 +5,10 @@ SECRETS="${OTTERSCALE_SECRETS_DIR:-/otterscale-secrets}"
 
 load_secret() {
   name=$1
-  eval "current=\${$name:-}"
-  if [ -n "$current" ]; then
-    return
-  fi
   if [ -s "${SECRETS}/${name}" ]; then
-    value=$(cat "${SECRETS}/${name}")
+    value=$(tr -d '\r\n' < "${SECRETS}/${name}")
     export "$name=$value"
+    return
   fi
 }
 

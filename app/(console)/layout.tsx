@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { liveSession, redirectSignedOut } from "@/lib/auth/live-session";
+import { hasOwner } from "@/lib/auth/owner";
 import { loadUserCapabilities } from "@/lib/authz/load-context";
 import { ConsoleShell } from "@/components/layout/console-shell";
 import { SignOutButton } from "@/components/auth/sign-out-button";
@@ -12,11 +12,11 @@ export default async function ConsoleLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/signin");
+  const session = await liveSession();
+  if (!session?.user?.id) redirectSignedOut(await hasOwner());
 
   const ctx = await loadUserCapabilities(session.user.id);
-  if (!ctx) redirect("/signin");
+  if (!ctx) redirectSignedOut(await hasOwner());
 
   return (
     <CapabilitiesProvider value={ctx}>

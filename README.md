@@ -18,7 +18,7 @@ Self-hosted team mesh control. No per-seat lock-in. A console on [Headscale](htt
 [![Auth.js](https://img.shields.io/badge/Auth.js-5-black?style=flat-square)](https://authjs.dev/)
 [![Caddy](https://img.shields.io/badge/Caddy-2-1F4D34?style=flat-square)](https://caddyserver.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square)](https://www.sqlite.org/)
-[![GHCR](https://img.shields.io/badge/GHCR-app%20%7C%20edge%20%7C%20headscale-2496ED?style=flat-square)](https://github.com/robosushie/otterscale/pkgs/container/otterscale%2Fapp)
+[![GHCR](https://img.shields.io/badge/GHCR-app%20%7C%20edge%20%7C%20headscale%20%7C%20standalone-2496ED?style=flat-square)](https://github.com/robosushie/otterscale/pkgs/container/otterscale%2Fapp)
 
 **Website:** [robosushie.github.io/otterscale](https://robosushie.github.io/otterscale/) — [features](https://robosushie.github.io/otterscale/features.html) · [deploy](https://robosushie.github.io/otterscale/deploy.html)
 
@@ -93,9 +93,19 @@ Requires [Docker](https://docs.docker.com/get-docker/) and Compose.
 
 ```bash
 pnpm deploy:stack
+pnpm deploy:stack --keep-data
 ```
 
-Creates or updates `.env` (generates `AUTH_SECRET`, sets SQLite `DATABASE_URL=file:/data/otterscale.db`), builds images, starts Headscale and `edge`, and writes `HEADSCALE_API_KEY` and `APPS_EDGE_AUTHKEY` after Headscale is healthy. The app container runs `prisma migrate deploy` before `node server.js`. Console: `https://console.localhost`.
+`deploy:stack` is the multi-container product (project `otterscale`). The default **deletes that project's volumes** and starts Headscale, then the init container, then the app and edge. `--keep-data` reuses those volumes. It generates `AUTH_SECRET` in `.env` when needed. Headscale API and edge pre-auth keys are minted onto the `otterscale_secrets` volume — not `.env`. Headscale only stores a hash, so plaintext cannot be read back from SQLite. Console: `https://console.localhost`.
+
+One container (Caddy, Headscale, console, tsnet), project `otterscale-standalone`:
+
+```bash
+pnpm deploy:standalone
+pnpm deploy:standalone --keep-data
+```
+
+Same wipe-or-keep rule, but only the standalone volume. Bootstrap writes keys under `/data/secrets`. The two products do not share volumes. Starting one stops the other so ports 80/443/8080 are free, and leaves the other product's volumes in place.
 
 If `*.localhost` does not resolve:
 
@@ -103,26 +113,22 @@ If `*.localhost` does not resolve:
 127.0.0.1 console.localhost hs.localhost
 ```
 
-To rotate the Headscale API key by hand:
-
-```bash
-docker exec headscale /ko-app/headscale apikeys create --expiration 8760h
-```
-
-Put the printed key in `.env` as `HEADSCALE_API_KEY`, then recreate the app container.
+Do not put `HEADSCALE_API_KEY` or `APPS_EDGE_AUTHKEY` in `.env`. `APPS_EDGE_AUTHKEY` is the pre-auth key the in-container tsnet proxy (`tag:edge`) uses to join this Headscale. Recreate with `pnpm deploy:stack` (or `--keep-data` if the secrets files are still on the volume).
 
 ## Production (GHCR)
 
-On a cloud VM or any Compose host, pull published images instead of building:
+Multi-container hosts use `pnpm deploy:stack` (builds from this repo). One-container hosts pull the standalone image:
+
+Images: `ghcr.io/robosushie/otterscale/{app,edge,headscale,standalone}`. Default tag is `latest`. Semver tags from **Actions → Publish GHCR** also move `latest`. Set `OTTERSCALE_DOMAIN` and `AUTH_URL` in production. Pin `AUTH_SECRET`. The init container (stack) or the standalone entrypoint mints Headscale keys onto that product's volume.
+
+One-container pull:
 
 ```bash
-cp deploy/otterscale-stack.env.example .env
-docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d
+cp deploy/otterscale-standalone.env.example .env
+docker compose -f deploy/otterscale-standalone.yaml --env-file .env up -d
 ```
 
-Images: `ghcr.io/robosushie/otterscale/{app,edge,headscale}`. Default tag is `latest`. Semver tags from **Actions → Publish GHCR** also move `latest`. Set `OTTERSCALE_DOMAIN` and `AUTH_URL` in production. Bootstrap mints `HEADSCALE_API_KEY`, `APPS_EDGE_AUTHKEY`, and `AUTH_SECRET` (if empty) after Headscale is healthy.
-
-If pulls return 401, open **Packages** for `app`, `edge`, and `headscale` and set visibility to public.
+If pulls return 401, open **Packages** for `app`, `edge`, `headscale`, and `standalone` and set visibility to public.
 
 Platform notes (cloud VMs, Railway, Heroku): [deploy page](https://robosushie.github.io/otterscale/deploy.html).
 
@@ -141,9 +147,7 @@ Never commit `.env`. Copy from [`.env.example`](./.env.example).
 | `AUTH_SETUP_TOKEN` | Optional | Token required for first Owner signup on `/setup` |
 | `HEADSCALE_INTERNAL_URL` | Docker | App → Headscale (`http://headscale:8080`) |
 | `HEADSCALE_PUBLIC_URL` | Docker | Public Headscale URL |
-| `HEADSCALE_API_KEY` | Docker | Filled by bootstrap / `deploy:stack` |
 | `OTTERSCALE_DOMAIN` | Production | Login-server for Add device (HTTPS). Unset → `http://127.0.0.1:8080` |
-| `APPS_EDGE_AUTHKEY` | Docker | Reusable `tag:edge` pre-auth key for the edge container |
 | `APPS_BASE_DOMAIN` | Optional | Network Apps hostname suffix (default `apps.localhost`) |
 
 ## Development
@@ -158,8 +162,11 @@ Prereqs: Node 22, pnpm 10.12.1, [Go 1.25](./go.mod) (for `cmd/proxy`), Docker fo
 | `pnpm build` | `prisma generate` + `next build` |
 | `pnpm db:make -- <name>` | New migration from schema (local; autogenerate only) |
 | `pnpm db:migrate` | Apply pending migrations |
-| `pnpm deploy:stack` | Build and run Docker stack |
-| `docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d` | Pull GHCR images |
+| `pnpm deploy:stack` | Wipe stack volumes, build, and run |
+| `pnpm deploy:stack --keep-data` | Rebuild stack on existing volumes |
+| `pnpm deploy:standalone` | Wipe standalone volume, build, and run |
+| `pnpm deploy:standalone --keep-data` | Rebuild standalone on existing volume |
+| `docker compose -f deploy/otterscale-standalone.yaml --env-file .env up -d` | Pull GHCR standalone image |
 
 After changing `prisma/schema.prisma`, run `pnpm db:make -- descriptive_name`. Never hand-edit `prisma/migrations/`.
 

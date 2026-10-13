@@ -75,6 +75,25 @@ function asStringList(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string" && item.length > 0);
 }
 
+/** Headscale 0.23 has used tags, validTags, and forcedTags for the same list. */
+export function collectNodeTags(raw: RawNode): string[] {
+  const preAuthKey = asRecord(raw.preAuthKey ?? raw.pre_auth_key);
+  const buckets = [
+    raw.tags,
+    raw.validTags,
+    raw.valid_tags,
+    raw.forcedTags,
+    raw.forced_tags,
+    preAuthKey.aclTags,
+    preAuthKey.acl_tags,
+  ];
+  const seen = new Set<string>();
+  for (const bucket of buckets) {
+    for (const tag of asStringList(bucket)) seen.add(tag);
+  }
+  return [...seen];
+}
+
 export function mapHeadscaleNode(raw: RawNode): HeadscaleNode {
   const hostInfo = asRecord(raw.hostInfo ?? raw.host_info);
   const userRaw = asRecord(raw.user);
@@ -91,7 +110,7 @@ export function mapHeadscaleNode(raw: RawNode): HeadscaleNode {
     name: String(raw.givenName ?? raw.given_name ?? raw.name ?? ""),
     hostname: String(hostInfo.hostname ?? raw.name ?? ""),
     user: userRaw.name || userRaw.id ? { name: String(userRaw.name ?? ""), id: String(userRaw.id ?? "") } : undefined,
-    tags: asStringList(raw.forcedTags ?? raw.forced_tags ?? raw.tags),
+    tags: collectNodeTags(raw),
     online: Boolean(raw.online),
     lastSeen: typeof lastSeen === "string" ? lastSeen : undefined,
     os: typeof hostInfo.os === "string" ? hostInfo.os : undefined,

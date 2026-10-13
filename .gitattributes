@@ -1,0 +1,8 @@
+# Linux images exec these files. LF on every OS so a shebang stays "#!/bin/sh".
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.hujson text eol=lf
+Caddyfile text eol=lf
+*.Caddyfile text eol=lf

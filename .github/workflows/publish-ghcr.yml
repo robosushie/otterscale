@@ -16,7 +16,7 @@ jobs:
   publish:
     name: Build and push ${{ matrix.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +30,9 @@ jobs:
           - name: headscale
             file: deploy/headscale/Dockerfile
             context: deploy/headscale
+          - name: standalone
+            file: deploy/standalone/Dockerfile
+            context: .
     steps:
       - uses: actions/checkout@v4
 

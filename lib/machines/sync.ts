@@ -2,11 +2,55 @@ import { AuditCategory } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { appendAuditEvent } from "@/lib/audit/write";
 import type { HeadscaleNode } from "@/lib/headscale/client";
+import { matchAclLabels } from "@/lib/machines/labels";
+
+async function applyNodeLabels(
+  machineId: string,
+  aclTags: string[] | undefined,
+  groups: { id: string; name: string }[],
+  tags: { id: string; aclTag: string }[],
+) {
+  if (!aclTags || aclTags.length === 0) return;
+  const { workspaceIds, tagIds } = matchAclLabels(aclTags, groups, tags);
+  if (workspaceIds.length === 0 && tagIds.length === 0) return;
+  const [currentWorkspaces, currentTags] = await Promise.all([
+    prisma.machineWorkspace.findMany({ where: { machineId }, select: { groupId: true } }),
+    prisma.machineTag.findMany({ where: { machineId }, select: { tagId: true } }),
+  ]);
+  const same = (left: string[], right: string[]) =>
+    left.length === right.length && left.every((id) => right.includes(id));
+  if (
+    same(
+      currentWorkspaces.map((link) => link.groupId),
+      workspaceIds,
+    ) &&
+    same(
+      currentTags.map((link) => link.tagId),
+      tagIds,
+    )
+  ) {
+    return;
+  }
+  await prisma.$transaction([
+    prisma.machineWorkspace.deleteMany({ where: { machineId } }),
+    prisma.machineTag.deleteMany({ where: { machineId } }),
+    ...(workspaceIds.length
+      ? [prisma.machineWorkspace.createMany({ data: workspaceIds.map((groupId) => ({ machineId, groupId })) })]
+      : []),
+    ...(tagIds.length
+      ? [prisma.machineTag.createMany({ data: tagIds.map((tagId) => ({ machineId, tagId })) })]
+      : []),
+  ]);
+}
 
 export async function syncMachinesFromHeadscale(
   organizationId: string,
   nodes: HeadscaleNode[],
 ): Promise<void> {
+  const [groups, tags] = await Promise.all([
+    prisma.group.findMany({ where: { organizationId }, select: { id: true, name: true } }),
+    prisma.tag.findMany({ where: { organizationId }, select: { id: true, aclTag: true } }),
+  ]);
   for (const node of nodes) {
     if (!node.id) continue;
     const existing = await prisma.machine.findUnique({
@@ -18,7 +62,7 @@ export async function syncMachinesFromHeadscale(
 
     if (!existing) {
       const createdById = await inferMachineCreator(organizationId, node.user?.name);
-      await prisma.machine.create({
+      const created = await prisma.machine.create({
         data: {
           organizationId,
           headscaleNodeId: node.id,
@@ -30,6 +74,7 @@ export async function syncMachinesFromHeadscale(
           createdById,
         },
       });
+      await applyNodeLabels(created.id, node.tags, groups, tags);
       await appendAuditEvent({
         organizationId,
         action: lastOnline ? "machine.online" : "machine.registered",
@@ -54,6 +99,7 @@ export async function syncMachinesFromHeadscale(
         createdById,
       },
     });
+    await applyNodeLabels(existing.id, node.tags, groups, tags);
     if (onlineChanged) {
       await appendAuditEvent({
         organizationId,

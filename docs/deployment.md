@@ -238,28 +238,55 @@ See [security.md](./security.md).
 
 ---
 
-## Otterscale Stack (Compose pull)
+## Otterscale Stack
 
-Canonical file: [`deploy/otterscale-stack.yaml`](../deploy/otterscale-stack.yaml). It pulls `ghcr.io/robosushie/otterscale/{app,edge,headscale}` and runs a one-shot **bootstrap** after Headscale is healthy (API key, `tag:edge` pre-auth key, `AUTH_SECRET` if unset).
+Local multi-container deploy builds from [`deploy/docker-compose.yml`](../deploy/docker-compose.yml). A one-shot **init** container runs after Headscale is healthy and writes `HEADSCALE_API_KEY` and the `tag:edge` pre-auth key (`APPS_EDGE_AUTHKEY`) onto the secrets volume. Pin `AUTH_SECRET` in `.env`. Do not put the Headscale keys there — Headscale stores only a hash, so they cannot be recovered from SQLite.
 
 ```bash
-cp deploy/otterscale-stack.env.example .env
-docker compose -f deploy/otterscale-stack.yaml --env-file .env up -d
+pnpm deploy:stack
+pnpm deploy:stack --keep-data
 ```
 
-Set `OTTERSCALE_DOMAIN` (and `AUTH_URL`) whenever TLS sits in front of Headscale. Local default login-server remains `http://127.0.0.1:8080`. Platform notes (AWS, Azure, GCP, Akamai, Render, Railway, Heroku) and the downloadable YAML live on the [GitHub Pages deploy page](https://robosushie.github.io/otterscale/deploy.html). Railway and Heroku cannot execute this Compose file as a single service.
+The default deletes this project's volumes. `--keep-data` reuses them. It does not touch the standalone project's volumes.
 
-Publish images with **Actions → Publish GHCR** (select branch, input tag). Local `pnpm deploy:stack` still builds from source via [`deploy/docker-compose.yml`](../deploy/docker-compose.yml).
+Set `OTTERSCALE_DOMAIN` (and `AUTH_URL`) whenever TLS sits in front of Headscale. Local default login-server remains `http://127.0.0.1:8080`. Platform notes live on the [GitHub Pages deploy page](https://robosushie.github.io/otterscale/deploy.html). Railway and Render should use the standalone image, not this Compose file.
+
+Publish images with **Actions → Publish GHCR** (select branch, input tag).
+
+---
+
+## Otterscale standalone (one container)
+
+Canonical image: `ghcr.io/robosushie/otterscale/standalone`. Dockerfile: [`deploy/standalone/Dockerfile`](../deploy/standalone/Dockerfile). Headscale, the Next.js console, Caddy, and the tsnet proxy share one process tree and one volume at `/data`.
+
+Local build (wipes the standalone volume; `--keep-data` reuses `/data/secrets` and SQLite):
+
+```bash
+pnpm deploy:standalone
+pnpm deploy:standalone --keep-data
+```
+
+Pull on a VM (`down -v` for a fresh disk; omit `-v` to keep it):
+
+```bash
+cp deploy/otterscale-standalone.env.example .env
+docker compose -f deploy/otterscale-standalone.yaml --env-file .env up -d
+```
+
+Caddy listens on 80/443 with internal TLS when `PORT` is unset. Railway and Render set `PORT`; Caddy then serves HTTP on that port and the platform terminates TLS. Headscale listens on `0.0.0.0:18080` so a published host port can reach it without taking `PORT`. In-container clients use `http://127.0.0.1:18080`. Local login-server remains `http://127.0.0.1:8080` (host `127.0.0.1:8080` → container `18080`).
+
+Set `AUTH_URL`, `OTTERSCALE_DOMAIN`, `CONSOLE_HOST`, and `HS_HOST` to the public HTTPS origins. Attach a disk at `/data`. Do not rewrite `HEADSCALE_INTERNAL_URL` in `.env` (stack still needs `http://headscale:8080`); Compose hardcodes loopback for this image.
 
 ---
 
 ## PaaS-specific notes
 
-### Railway
+### Railway / Render
 
-- TCP proxy; **no inbound UDP** → DERP on external VM
-- Do not run [`otterscale-stack.yaml`](../deploy/otterscale-stack.yaml) as one Railway service (no shared volumes). Map the three GHCR images; mint keys by hand.
-- All-in-one may run multiple tenant processes if **persistent volume** and port range available [verify on trial deploy]
+- Prefer the **standalone** image (`deploy/standalone/Dockerfile` or `ghcr.io/robosushie/otterscale/standalone`) as one service with a persistent disk on `/data` (keys live in `/data/secrets`)
+- Set `AUTH_SECRET`, `AUTH_URL`, `OTTERSCALE_DOMAIN`, `CONSOLE_HOST`, and `HS_HOST`; the platform sets `PORT`. Leave Headscale API keys unset
+- TCP proxy; **no inbound UDP** → DERP on an external VM
+- Do not run the multi-container Compose file as one Railway service (no shared volumes). Use `pnpm deploy:stack` on a VM.
 
 ### AWS
 
