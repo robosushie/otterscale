@@ -115,9 +115,8 @@
           <p class="caption">Where it runs</p>
           <h2>Pick a provider</h2>
           <p>
-            The image list above is the tag. Type every value with no quote characters around it.
-            On a VM, switch between Standalone (one container) and Stack (multiple containers). PaaS hosts use the standalone image.
-            <code>tailscale up</code> needs a raw TCP path to port 18080 when the host’s HTTPS proxy sits in front of Headscale.
+            The image list above is the tag. On a VM, use Standalone (one container) or Stack (multiple containers). Other hosts run the standalone image.
+            <code>tailscale up</code> needs raw TCP to port 18080 when an HTTPS proxy sits in front of Headscale.
           </p>
         </header>
         <label class="provider-field" data-reveal>
