@@ -110,181 +110,20 @@
         </div>
       </section>
 
-      <section class="section">
+      <section class="section" id="providers">
         <header data-reveal>
-          <h2>A VM with Docker</h2>
-          <p>Use option 1. Security group or firewall: TCP 80 and 443. Point DNS at the console host and the Headscale host.</p>
-        </header>
-        <details class="platform" open data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">terminal</span>
-            Any Linux VM
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>Install Docker Engine and the Compose plugin.</li>
-              <li>Download <code>otterscale-stack.yaml</code> or <code>otterscale-standalone.yaml</code>, and the matching env example.</li>
-              <li>Save the env example as <code>.env</code>. Set <code>OTTERSCALE_IMAGE_TAG</code>, <code>AUTH_SECRET</code>, <code>AUTH_URL</code>, and <code>OTTERSCALE_DOMAIN</code>.</li>
-              <li><code>docker compose -f otterscale-stack.yaml --env-file .env up -d</code>, or the standalone file.</li>
-              <li>Open the console host. The first visit is <code>/setup</code>. The Tailscale login server is the Headscale hostname.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">cloud</span>
-            AWS EC2
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>Launch Ubuntu. Security group: TCP 80 and 443.</li>
-              <li>Install Docker Compose. Copy the stack or standalone file and its env example onto the instance.</li>
-              <li>Route 53 records for the console and Headscale. Set those names in <code>.env</code> with <code>OTTERSCALE_IMAGE_TAG</code>.</li>
-              <li><code>docker compose -f otterscale-stack.yaml --env-file .env up -d</code>, or the standalone file.</li>
-              <li>Caddy’s certificates are internal. Put a public proxy in front when browsers must trust the console.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">deployed_code</span>
-            Azure Virtual Machine
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>Create a VM. NSG: TCP 80 and 443. Attach a data disk for Docker volumes.</li>
-              <li>Install Docker Compose. Copy the stack or standalone file and its env example.</li>
-              <li>DNS for the console and Headscale. Set <code>OTTERSCALE_DOMAIN</code> and <code>OTTERSCALE_IMAGE_TAG</code>.</li>
-              <li><code>docker compose --env-file .env up -d</code> with the file you copied.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">dns</span>
-            GCP Compute Engine
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>Create a VM. VPC firewall: HTTP and HTTPS. Reserve a static IP.</li>
-              <li>Cloud DNS for the console and Headscale. Install Docker Compose.</li>
-              <li>Copy the stack or standalone file and its env example. Set <code>OTTERSCALE_IMAGE_TAG</code>.</li>
-              <li>Keep host port 8080 on localhost. Clients use the Headscale hostname on 443.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">lan</span>
-            DigitalOcean Droplet
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>Create a Droplet with Docker, or install Docker Compose. Cloud Firewall: TCP 80 and 443.</li>
-              <li>Copy the stack or standalone file and its env example. Set <code>OTTERSCALE_IMAGE_TAG</code> and the public hostnames.</li>
-              <li><code>docker compose -f otterscale-stack.yaml --env-file .env up -d</code>, or the standalone file.</li>
-            </ol>
-          </div>
-        </details>
-      </section>
-
-      <section class="section">
-        <header data-reveal>
-          <h2>One container</h2>
+          <p class="caption">Where it runs</p>
+          <h2>Pick a provider</h2>
           <p>
-            Use option 2. These hosts run the standalone image and do not run the Compose file. Mount a disk at <code>/data</code>.
-            The platform sets <code>PORT</code>. App Runner, Lightsail Containers, and Heroku cannot keep <code>/data</code>.
+            The image list above is the tag. Type every value with no quote characters around it.
+            A disk at <code>/data</code> is required. <code>tailscale up</code> needs a raw TCP path to port 18080 when the host’s HTTPS proxy sits in front of Headscale.
           </p>
         </header>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">route</span>
-            Railway
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>One service from <code>ghcr.io/robosushie/otterscale/standalone</code>, tag from the list above.</li>
-              <li>Volume at <code>/data</code>. Railway sets <code>PORT</code>.</li>
-              <li>Set <code>AUTH_SECRET</code>, <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> from the standalone env example. Leave the Headscale keys unset.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">web_asset</span>
-            Render
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>One web service from <code>ghcr.io/robosushie/otterscale/standalone</code>, tag from the list above.</li>
-              <li>Persistent disk at <code>/data</code>. Render sets <code>PORT</code>.</li>
-              <li>Set <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> to the public HTTPS hostnames.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">flight</span>
-            Fly.io
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>One Machine from <code>ghcr.io/robosushie/otterscale/standalone</code>.</li>
-              <li>Fly volume mounted at <code>/data</code>. Set the public port to the platform <code>PORT</code>.</li>
-              <li>Same env list as the standalone example. Two hostnames: console and Headscale.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">deployed_code</span>
-            DigitalOcean App Platform
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>One component from <code>ghcr.io/robosushie/otterscale/standalone</code>.</li>
-              <li>Attach a volume at <code>/data</code>. The platform sets <code>PORT</code>.</li>
-              <li>Copy <code>AUTH_SECRET</code>, <code>AUTH_URL</code>, <code>OTTERSCALE_DOMAIN</code>, <code>CONSOLE_HOST</code>, and <code>HS_HOST</code> from the standalone env example.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">cloud</span>
-            Azure Container Apps
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>One container from <code>ghcr.io/robosushie/otterscale/standalone</code>.</li>
-              <li>Azure Files mounted at <code>/data</code>. Ingress uses the platform port.</li>
-              <li>Set the standalone env values. Leave <code>HEADSCALE_API_KEY</code> and <code>APPS_EDGE_AUTHKEY</code> empty.</li>
-            </ol>
-          </div>
-        </details>
-        <details class="platform" data-reveal>
-          <summary>
-            <span class="material-symbols-outlined" aria-hidden="true">dns</span>
-            GCP Cloud Run
-          <span class="material-symbols-outlined accordion-chevron" aria-hidden="true">keyboard_arrow_down</span>
-          </summary>
-          <div class="body">
-            <ol class="steps">
-              <li>One service from <code>ghcr.io/robosushie/otterscale/standalone</code>.</li>
-              <li>Mount a network disk at <code>/data</code>. Without that disk the Headscale database disappears on the next instance.</li>
-              <li>Cloud Run sets <code>PORT</code>. Set the standalone env values for the console and Headscale hostnames.</li>
-            </ol>
-          </div>
-        </details>
+        <label class="provider-field" data-reveal>
+          Provider
+          <select data-provider aria-label="Provider"></select>
+        </label>
+        <div data-provider-panel></div>
       </section>
 
       <footer class="footer">
@@ -299,5 +138,6 @@
     <script src="./js/nav.js"></script>
     <script src="./js/landing.js"></script>
     <script src="./js/deploy.js"></script>
+    <script src="./js/providers.js"></script>
   </body>
 </html>
