@@ -262,6 +262,14 @@ a {
   margin-bottom: 32px;
 }
 
+.section header .caption {
+  margin-bottom: 8px;
+}
+
+.section header h2 + p {
+  margin-top: 12px;
+}
+
 .grid {
   display: grid;
   gap: 16px;

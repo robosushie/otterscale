@@ -35,21 +35,25 @@
         <div class="wash" data-wash aria-hidden="true"></div>
         <div class="hero-copy" data-reveal>
           <p class="caption">Production</p>
-          <h1>Pull a published tag.</h1>
+          <h1>Two ways to deploy.</h1>
           <p class="lede">
-            <code>OTTERSCALE_IMAGE_TAG</code> selects the GHCR images in the two Compose files below.
-            <code>pnpm deploy:stack</code> and <code>pnpm deploy:standalone</code> still build from a git checkout
-            and ignore that variable.
+            Use a Compose file, and Compose pulls the images for you. Or copy a published image path and
+            <code>docker pull</code> it yourself. <code>pnpm deploy:stack</code> and
+            <code>pnpm deploy:standalone</code> still build from a git checkout and ignore
+            <code>OTTERSCALE_IMAGE_TAG</code>.
           </p>
         </div>
       </header>
 
       <section class="section">
         <header data-reveal>
-          <h2>Compose files</h2>
+          <p class="caption">Option 1</p>
+          <h2>Compose file</h2>
           <p>
-            Copy the env example to <code>.env</code>, set <code>OTTERSCALE_IMAGE_TAG</code>, then
-            <code>docker compose -f</code> that file <code>--env-file .env up -d</code>.
+            Download the file and its env example. Save the example as <code>.env</code> and set
+            <code>OTTERSCALE_IMAGE_TAG</code>.
+            <code>docker compose -f</code> that file <code>--env-file .env up -d</code> pulls the GHCR images and starts them.
+            Stack is four containers on a VM. Standalone is one container.
           </p>
         </header>
         <div class="file-grid" data-reveal>
@@ -86,7 +90,12 @@
 
       <section class="section">
         <header data-reveal>
-          <h2>Published images</h2>
+          <p class="caption">Option 2</p>
+          <h2>Pull an image</h2>
+          <p>
+            Copy an image path and run <code>docker pull</code>, or paste that path into a host that does not run Compose.
+            You do not need the Compose file for this. The latest tag is the current publish.
+          </p>
         </header>
         <div data-releases data-reveal>
           <p>No published docker images.</p>
@@ -96,7 +105,7 @@
       <section class="section">
         <header data-reveal>
           <h2>A VM with Docker</h2>
-          <p>Both Compose files. Security group or firewall: TCP 80 and 443. Point DNS at the console host and the Headscale host.</p>
+          <p>Use option 1. Security group or firewall: TCP 80 and 443. Point DNS at the console host and the Headscale host.</p>
         </header>
         <details class="platform" open data-reveal>
           <summary>
@@ -175,7 +184,7 @@
         <header data-reveal>
           <h2>One container</h2>
           <p>
-            These hosts run the standalone image. They do not run the Compose file. Mount a disk at <code>/data</code>.
+            Use option 2. These hosts run the standalone image and do not run the Compose file. Mount a disk at <code>/data</code>.
             The platform sets <code>PORT</code>. App Runner, Lightsail Containers, and Heroku cannot keep <code>/data</code>.
           </p>
         </header>
