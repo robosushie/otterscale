@@ -14,28 +14,65 @@
     "APPS_BASE_DOMAIN=<custom domain>",
   ].join("\n");
 
-  const compose = "docker compose -f otterscale-standalone.yaml --env-file .env up -d";
+  const composeStandalone = "docker compose -f otterscale-standalone.yaml --env-file .env up -d";
+  const composeStack = "docker compose -f otterscale-stack.yaml --env-file .env up -d";
+
+  const envStack = [
+    "OTTERSCALE_IMAGE_TAG=<tag>",
+    "AUTH_SECRET=<secret>",
+    "AUTH_URL=https://console.<custom domain>",
+    "OTTERSCALE_DOMAIN=hs.<custom domain>",
+    "CONSOLE_HOST=console.<custom domain>",
+    "HS_HOST=hs.<custom domain>",
+    "HEADSCALE_PUBLIC_URL=https://hs.<custom domain>",
+    "APPS_BASE_DOMAIN=<custom domain>",
+  ].join("\n");
 
   const joinHttps = "tailscale up --login-server https://hs.<custom domain> --auth-key <key>";
+  const tls = "Caddy uses an internal certificate. Browsers and tailscale up trust the login server after a public certificate sits in front and still forwards Upgrade: tailscale-control-protocol on /ts2021.";
 
-  function step(num, title, paragraphs, file, code) {
-    return { num: num, title: title, paragraphs: paragraphs, file: file, code: code };
+  function vmMethods(host) {
+    return [
+      {
+        tab: "Standalone (One container)",
+        note: "Copy otterscale-standalone.yaml and otterscale-standalone.env.example from the Compose section.",
+        steps: [
+          step("01", host.title, [host.standalone], host.file, host.code),
+          step("02", "Environment", [
+            "Save the example as .env. Replace <tag> with the tag in Pull an image, and the hostnames with yours. No quote marks. Leave HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY unset. The first boot writes them onto the Docker volume at /data. Leave PORT unset so Caddy serves 80 and 443.",
+          ], ".env", envVm),
+          step("03", "Start", [
+            "Compose pulls the standalone image. /data stays on a Docker volume across restarts.",
+          ], "shell", composeStandalone),
+          step("04", "DNS and ports", [host.dns + " " + tls], "dns", host.dnsCode),
+          step("05", "Join a device", [
+            "Join once a public certificate in front of Caddy is trusted. The login server is the Headscale hostname.",
+          ], "shell", joinHttps),
+        ],
+      },
+      {
+        tab: "Stack (Multiple Containers)",
+        note: "Copy otterscale-stack.yaml and otterscale-stack.env.example from the Compose section. Headscale, core, the console, and edge each run as their own container.",
+        steps: [
+          step("01", host.title, [host.stack], host.file, host.code),
+          step("02", "Environment", [
+            "Save the example as .env. AUTH_SECRET is required and must be at least 32 characters. No quote marks. Leave HEADSCALE_API_KEY, APPS_EDGE_AUTHKEY, and HEADSCALE_INTERNAL_URL unset. Init writes the keys onto the otterscale_secrets volume. Leave PORT unset.",
+          ], ".env", envStack),
+          step("03", "Start", [
+            "Compose pulls headscale, core, app, and edge at the same tag. Headscale stays on 127.0.0.1:8080. Edge publishes 80 and 443. Named volumes keep the database, secrets, and proxy state.",
+          ], "shell", composeStack),
+          step("04", "DNS and ports", [host.dns + " " + tls], "dns", host.dnsCode),
+          step("05", "Join a device", [
+            "Join once a public certificate in front of Caddy is trusted. The login server is the Headscale hostname.",
+          ], "shell", joinHttps),
+        ],
+      },
+    ];
   }
 
-  const vmSteps = [
-    step("01", "Install Docker", [
-      "Install Docker Engine and the Compose plugin on the VM. Copy otterscale-standalone.yaml and its env example from the Compose section above into the same directory.",
-    ], "shell", "docker compose version"),
-    step("02", "Environment", [
-      "Save the example as .env. Replace <tag> with the tag in Pull an image, and the hostnames with yours. No quote marks. Leave HEADSCALE_API_KEY and APPS_EDGE_AUTHKEY unset. The first boot writes them onto the Docker volume.",
-    ], ".env", envVm),
-    step("03", "Start", [
-      "Compose pulls the standalone image and keeps /data on a Docker volume. The stack file is the alternative when you want four containers instead of one.",
-    ], "shell", compose),
-    step("04", "DNS and ports", [
-      "Open TCP 80 and 443 to the VM. Point the console name, the Headscale name, and *.<custom domain> at that address. Caddy on this image uses an internal certificate, so browsers and tailscale up trust the login server only after a public certificate sits in front and still forwards Upgrade: tailscale-control-protocol on /ts2021.",
-    ], "shell", joinHttps),
-  ];
+  function step(num, title, paragraphs, file, code) {
+    return { num: num, title: title, paragraphs: paragraphs, file: file || "", code: code || "" };
+  }
 
   const providers = [
     {
@@ -80,10 +117,10 @@
       steps: [
         step("01", "What Render can host", [
           "A paid web service can keep a disk at /data and serve the console and published apps over HTTPS, including a wildcard domain. Render does not publish a raw TCP port to the internet, so tailscale up cannot use the HTTPS URL. Use Railway, Fly.io, Azure Container Apps, or a VM when devices must join.",
-        ], "image", image),
+        ]),
         step("02", "Disk and port", [
-          "Create a web service from the image. Add a persistent disk mounted at /data. Set the service port to 8080 so it matches PORT. One instance. Render’s own default port is 10000, which collides with nothing, but 8080 matches the domains you will attach.",
-        ], "mount", "/data"),
+          "Create a web service from the image. Add a persistent disk mounted at /data. Set the service port to 8080 so it matches PORT. One instance.",
+        ], "mount", "/data\nport 8080"),
         step("03", "Variables", [
           "No quote characters. These names are hostnames. Devices still need a login server on a host that can expose TCP 18080.",
         ], "variables", [
@@ -163,8 +200,8 @@
           "App Platform does not support volumes. The filesystem is ephemeral, so the Headscale database and keys disappear on the next deploy. Do not run this image there.",
         ], "docs", "https://docs.digitalocean.com/products/app-platform/details/limits/"),
         step("02", "Use a Droplet", [
-          "A Droplet with a block volume, or Docker’s own volume, can keep /data. Select DigitalOcean Droplet in this list and follow those steps.",
-        ], "shell", compose),
+          "A Droplet can keep the data on Docker volumes. Select DigitalOcean Droplet in this list. That page has the standalone file and the stack file.",
+        ]),
       ],
     },
     {
@@ -178,10 +215,19 @@
         step("02", "Azure Files", [
           "Create a classic file share and add it to the Container Apps environment. Mount it on the container at /data. NFS or SMB both work if the environment storage type matches the share.",
         ], "mount", "/data"),
-        step("03", "HTTP and TCP ingress", [
-          "HTTP ingress, external, target port 8080, for the console and apps. Custom domains attach only to HTTP ingress. Add a second ingress with transport tcp, target port 18080, and an exposed port that is unique in the environment and is not 80 or 443. External TCP requires an environment joined to a virtual network. The login URL is the app FQDN plus that exposed port.",
+        step("03", "HTTP ingress", [
+          "HTTP ingress, external, target port 8080, for the console and apps. Custom domains attach only to this ingress.",
         ], "shell", "az containerapp ingress enable --name otterscale --resource-group <group> --type external --target-port 8080 --transport auto"),
-        step("04", "Variables", [
+        step("04", "TCP port", [
+          "Headscale needs a second TCP port. Add it under ingress.additionalPortMappings, then apply the app YAML. The exposed port is unique in the environment and is not 80 or 443. External TCP requires the app to be external and the environment to be joined to a virtual network. The login URL is the app FQDN plus that exposed port.",
+        ], "ingress.yaml", [
+          "ingress:",
+          "  additionalPortMappings:",
+          "    - external: true",
+          "      targetPort: 18080",
+          "      exposedPort: <exposed-port>",
+        ].join("\n")),
+        step("05", "Variables", [
           "No quote characters in the values. OTTERSCALE_DOMAIN includes http:// and the TCP exposed port. HS_HOST stays a hostname for the HTTP name.",
         ], "variables", [
           "PORT=8080",
@@ -191,7 +237,7 @@
           "OTTERSCALE_DOMAIN=http://<app>.<env-suffix>:<exposed-port>",
           "APPS_BASE_DOMAIN=<custom domain>",
         ].join("\n")),
-        step("05", "Join a device", [
+        step("06", "Join a device", [
           "tailscale up uses the TCP FQDN and exposed port. The console uses the custom HTTPS domain on the HTTP ingress.",
         ], "shell", "tailscale up --login-server http://<app>.<env-suffix>:<exposed-port> --auth-key <key>"),
       ],
@@ -205,79 +251,79 @@
           "Cloud Run’s public ingress is HTTP only, so it cannot carry the Tailscale login connection. A Cloud Storage mount is also a poor disk for Headscale’s SQLite file. Use Compute Engine.",
         ], "docs", "https://cloud.google.com/run/docs/configuring/services/cloud-storage-volume-mounts"),
         step("02", "Compute Engine", [
-          "Select GCP Compute Engine in this list. That VM can open TCP 80 and 443 and keep /data on a Docker volume.",
-        ], "shell", compose),
+          "Select GCP Compute Engine in this list. That VM can open TCP 80 and 443 and keep data on Docker volumes, with either Compose file.",
+        ]),
       ],
     },
     {
       group: "A VM with Docker",
       id: "vm",
       label: "Any Linux VM",
-      steps: vmSteps,
+      methods: vmMethods({
+        title: "Install Docker",
+        file: "shell",
+        code: "docker compose version",
+        standalone: "Install Docker Engine and the Compose plugin. Copy otterscale-standalone.yaml and its env example into the same directory. This confirms the plugin is present.",
+        stack: "Install Docker Engine and the Compose plugin. Copy otterscale-stack.yaml and its env example into the same directory. This confirms the plugin is present.",
+        dns: "Open TCP 80 and 443 to the VM. Point these names at that address.",
+        dnsCode: "TCP 80\nTCP 443\nconsole.<custom domain>\nhs.<custom domain>\n*.<custom domain>",
+      }),
     },
     {
       group: "A VM with Docker",
       id: "ec2",
       label: "AWS EC2",
-      steps: [
-        step("01", "Instance", [
-          "Launch Ubuntu and attach a security group that allows TCP 80 and 443 from the internet. SSH stays on 22 for you. Use option 1, the standalone Compose file, not four images pasted in by hand.",
-        ], "ports", "TCP 80\nTCP 443"),
-        step("02", "Environment", [
-          "Install Docker Compose. Copy the standalone file and the env example onto the instance. Save it as .env with no quote characters. Route 53 records: console, Headscale, and the apps wildcard, all aimed at the instance.",
-        ], ".env", envVm),
-        step("03", "Start", [
-          "Compose pulls the image and stores /data in a Docker volume. Caddy’s certificate is internal until a public certificate proxies 443 and still passes the Tailscale upgrade on /ts2021.",
-        ], "shell", compose + "\n" + joinHttps),
-      ],
+      methods: vmMethods({
+        title: "Instance",
+        file: "ports",
+        code: "TCP 80\nTCP 443",
+        standalone: "Launch Ubuntu and attach a security group that allows TCP 80 and 443 from the internet. SSH stays on 22 for you. Install Docker Compose and copy otterscale-standalone.yaml and its env example onto the instance.",
+        stack: "Launch Ubuntu and attach a security group that allows TCP 80 and 443 from the internet. SSH stays on 22 for you. Install Docker Compose and copy otterscale-stack.yaml and its env example onto the instance.",
+        dns: "Route 53 records for these names aim at the instance.",
+        dnsCode: "console.<custom domain>\nhs.<custom domain>\n*.<custom domain>",
+      }),
     },
     {
       group: "A VM with Docker",
       id: "azure-vm",
       label: "Azure Virtual Machine",
-      steps: [
-        step("01", "VM and disk", [
-          "Create an Ubuntu VM. Network security group: TCP 80 and 443. A data disk is optional if Docker’s volume lives on the OS disk. Copy the standalone Compose file and the env example.",
-        ], "ports", "TCP 80\nTCP 443"),
-        step("02", "Environment", [
-          "DNS for the console, Headscale, and the apps wildcard. Values have no quote characters.",
-        ], ".env", envVm),
-        step("03", "Start", [
-          "The login server is the Headscale hostname over HTTPS once clients trust the certificate in front of Caddy.",
-        ], "shell", compose + "\n" + joinHttps),
-      ],
+      methods: vmMethods({
+        title: "VM and disk",
+        file: "ports",
+        code: "TCP 80\nTCP 443",
+        standalone: "Create an Ubuntu VM. Network security group: TCP 80 and 443. A data disk is optional if Docker’s volume lives on the OS disk. Copy otterscale-standalone.yaml and the env example.",
+        stack: "Create an Ubuntu VM. Network security group: TCP 80 and 443. A data disk is optional if Docker’s volumes live on the OS disk. Copy otterscale-stack.yaml and the env example.",
+        dns: "Point these names at the VM.",
+        dnsCode: "console.<custom domain>\nhs.<custom domain>\n*.<custom domain>",
+      }),
     },
     {
       group: "A VM with Docker",
       id: "gce",
       label: "GCP Compute Engine",
-      steps: [
-        step("01", "VM and firewall", [
-          "Create a VM, reserve a static IP, and allow tcp:80 and tcp:443 on the VPC firewall. Cloud DNS records for the console, Headscale, and the apps wildcard point at that IP.",
-        ], "shell", "gcloud compute firewall-rules create otterscale-web --allow=tcp:80,tcp:443"),
-        step("02", "Environment", [
-          "Install Docker Compose. The .env values are the public hostnames, with no quote characters. Leave PORT unset so Caddy serves 80 and 443 itself.",
-        ], ".env", envVm),
-        step("03", "Start", [
-          "Clients use the Headscale hostname on 443. Host port 18080 stays on the machine for local checks. Do not publish 18080 in place of 443.",
-        ], "shell", compose + "\n" + joinHttps),
-      ],
+      methods: vmMethods({
+        title: "VM and firewall",
+        file: "shell",
+        code: "gcloud compute firewall-rules create otterscale-web --allow=tcp:80,tcp:443",
+        standalone: "Create a VM and reserve a static IP. Allow tcp:80 and tcp:443 on the VPC firewall. Install Docker Compose and copy otterscale-standalone.yaml and the env example.",
+        stack: "Create a VM and reserve a static IP. Allow tcp:80 and tcp:443 on the VPC firewall. Install Docker Compose and copy otterscale-stack.yaml and the env example.",
+        dns: "Cloud DNS records for these names point at the static IP. Clients use the Headscale hostname on 443. Do not publish 18080 in place of 443.",
+        dnsCode: "console.<custom domain>\nhs.<custom domain>\n*.<custom domain>",
+      }),
     },
     {
       group: "A VM with Docker",
       id: "droplet",
       label: "DigitalOcean Droplet",
-      steps: [
-        step("01", "Droplet", [
-          "Create a Droplet with Docker, or install the Compose plugin. Cloud Firewall: TCP 80 and 443. This is the DigitalOcean path that can keep /data. App Platform cannot.",
-        ], "ports", "TCP 80\nTCP 443"),
-        step("02", "Environment", [
-          "Copy the standalone Compose file and the env example. Point DNS at the Droplet for the console, Headscale, and the apps wildcard.",
-        ], ".env", envVm),
-        step("03", "Start", [
-          "Compose pulls the published image. The login server is the Headscale hostname after TLS in front of Caddy is trusted.",
-        ], "shell", compose + "\n" + joinHttps),
-      ],
+      methods: vmMethods({
+        title: "Droplet",
+        file: "ports",
+        code: "TCP 80\nTCP 443",
+        standalone: "Create a Droplet with Docker, or install the Compose plugin. Cloud Firewall: TCP 80 and 443. Copy otterscale-standalone.yaml and the env example. This is the DigitalOcean path that can keep the data. App Platform cannot.",
+        stack: "Create a Droplet with Docker, or install the Compose plugin. Cloud Firewall: TCP 80 and 443. Copy otterscale-stack.yaml and the env example. This is the DigitalOcean path that can keep the data. App Platform cannot.",
+        dns: "Point these names at the Droplet.",
+        dnsCode: "console.<custom domain>\nhs.<custom domain>\n*.<custom domain>",
+      }),
     },
   ];
 
@@ -288,40 +334,70 @@
     return node;
   }
 
+  function renderStep(item) {
+    const row = add(panel, "article");
+    row.className = "guide-step";
+    const copy = add(row, "div");
+    copy.className = "guide-copy";
+    add(copy, "span", item.num).className = "guide-num";
+    add(copy, "h3", item.title);
+    item.paragraphs.forEach((paragraph) => add(copy, "p", paragraph));
+    if (!item.code) {
+      row.classList.add("guide-step-text");
+      return;
+    }
+    const snippet = add(row, "div");
+    snippet.className = "snippet";
+    const bar = add(snippet, "div");
+    bar.className = "snippet-bar";
+    const title = add(bar, "span");
+    title.className = "snippet-title";
+    const dots = add(title, "span");
+    dots.className = "snippet-dots";
+    dots.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 3; i += 1) add(dots, "span").className = "snippet-dot";
+    add(title, "span", item.file);
+    const button = add(bar, "button");
+    button.type = "button";
+    button.className = "snippet-copy";
+    button.setAttribute("data-copy-text", item.code);
+    button.setAttribute("aria-label", "Copy " + item.file);
+    const icon = add(button, "span", "content_copy");
+    icon.className = "material-symbols-outlined";
+    icon.setAttribute("aria-hidden", "true");
+    add(button, "span", "Copy");
+    const pre = add(snippet, "pre");
+    add(pre, "code", item.code);
+  }
+
+  let methodIndex = 0;
+
   function render(id) {
     const provider = providers.find((item) => item.id === id) || providers[0];
     panel.replaceChildren();
-    provider.steps.forEach((item) => {
-      const row = add(panel, "article");
-      row.className = "guide-step";
-      const copy = add(row, "div");
-      copy.className = "guide-copy";
-      add(copy, "span", item.num).className = "guide-num";
-      add(copy, "h3", item.title);
-      item.paragraphs.forEach((paragraph) => add(copy, "p", paragraph));
-      const snippet = add(row, "div");
-      snippet.className = "snippet";
-      const bar = add(snippet, "div");
-      bar.className = "snippet-bar";
-      const title = add(bar, "span");
-      title.className = "snippet-title";
-      const dots = add(title, "span");
-      dots.className = "snippet-dots";
-      dots.setAttribute("aria-hidden", "true");
-      for (let i = 0; i < 3; i += 1) add(dots, "span").className = "snippet-dot";
-      add(title, "span", item.file);
-      const button = add(bar, "button");
-      button.type = "button";
-      button.className = "snippet-copy";
-      button.setAttribute("data-copy-text", item.code);
-      button.setAttribute("aria-label", "Copy " + item.file);
-      const icon = add(button, "span", "content_copy");
-      icon.className = "material-symbols-outlined";
-      icon.setAttribute("aria-hidden", "true");
-      add(button, "span", "Copy");
-      const pre = add(snippet, "pre");
-      add(pre, "code", item.code);
-    });
+    const methods = provider.methods;
+    const steps = methods ? methods[Math.min(methodIndex, methods.length - 1)].steps : provider.steps;
+    if (methods) {
+      const method = methods[Math.min(methodIndex, methods.length - 1)];
+      const tabs = add(panel, "div");
+      tabs.className = "method-tabs";
+      tabs.setAttribute("role", "tablist");
+      tabs.setAttribute("aria-label", "Install method");
+      methods.forEach((item, index) => {
+        const button = add(tabs, "button", item.tab);
+        const selected = item === method;
+        button.type = "button";
+        button.className = "method-tab" + (selected ? " is-active" : "");
+        button.setAttribute("role", "tab");
+        button.setAttribute("aria-selected", selected ? "true" : "false");
+        button.addEventListener("click", () => {
+          methodIndex = index;
+          render(select.value);
+        });
+      });
+      add(panel, "p", method.note).className = "method-note";
+    }
+    steps.forEach(renderStep);
   }
 
   const groups = [];
