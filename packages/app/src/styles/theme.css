@@ -155,6 +155,14 @@ a.link:hover {
   align-items: center;
 }
 
+.cell-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .console-table .cell-end {
   justify-content: flex-end;
   gap: 0.5rem;

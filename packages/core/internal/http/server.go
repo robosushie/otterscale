@@ -32,6 +32,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/totp", a.totpURI)
 	mux.HandleFunc("POST /api/auth/signin", a.signin)
 	mux.HandleFunc("POST /api/auth/signout", a.signout)
+	mux.HandleFunc("POST /api/auth/invite/lookup", a.lookupInvite)
 	mux.HandleFunc("POST /api/auth/redeem", a.redeemInvite)
 	mux.HandleFunc("GET /api/auth/oidc/start", a.oidcStart)
 	mux.HandleFunc("GET /api/auth/oidc/callback", a.oidcCallback)

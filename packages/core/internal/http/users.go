@@ -12,6 +12,22 @@ import (
 	"otterscale/core/internal/store"
 )
 
+func (a *API) lookupInvite(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		fail(w, http.StatusBadRequest, "Invalid body")
+		return
+	}
+	invite, err := a.Store.FindInviteByCode(r.Context(), body.Code)
+	if err != nil {
+		fail(w, http.StatusBadRequest, "Invalid or expired invite.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"email": invite.Email, "username": invite.Username})
+}
+
 func (a *API) redeemInvite(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		InviteCode, Email, Username, Password, ConfirmPassword, TotpCode, TotpSecret string
