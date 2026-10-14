@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export function useLive<T>(topic: "machines" | "workspaces", apply: (data: T) => void) {
+export function useLive<T>(topic: "machines" | "workspaces" | "users", apply: (data: T) => void) {
   useEffect(() => {
     const source = new EventSource("/api/live");
     const onEvent = (event: Event) => {

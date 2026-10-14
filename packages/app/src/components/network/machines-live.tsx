@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, type MachinesTable } from "@/api/client";
 import { MachinesTable as MachinesGrid } from "@/components/network/machine-editor";
+import { useCapabilities } from "@/hooks/use-capabilities";
 
 export function MachinesLive({ initial }: { initial: MachinesTable }) {
+  const ctx = useCapabilities();
   const [data, setData] = useState(initial);
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function MachinesLive({ initial }: { initial: MachinesTable }) {
       </p>
       <MachinesGrid
         rows={data.rows}
-        canManage={data.canManage}
+        currentUserId={ctx.userId}
         workspaces={data.workspaces}
         tags={data.tags}
         onMutated={reload}

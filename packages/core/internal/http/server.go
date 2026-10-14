@@ -54,6 +54,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/apps", a.publishApp)
 	mux.HandleFunc("DELETE /api/apps/{id}", a.deleteApp)
 	mux.HandleFunc("GET /api/users", a.users)
+	mux.HandleFunc("GET /api/users/invites", a.invites)
 	mux.HandleFunc("POST /api/users/invites", a.createInvite)
 	mux.HandleFunc("POST /api/users/invites/{id}/revoke", a.revokeInvite)
 	mux.HandleFunc("GET /api/audit", a.audit)

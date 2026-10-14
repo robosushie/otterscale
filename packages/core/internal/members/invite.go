@@ -149,6 +149,44 @@ func ApplyInvite(ctx context.Context, database *db.DB, userID, email string, inv
 	return audit.Append(ctx, database, invite.OrganizationID, userID, "member.invite_redeemed", "SYSTEM", "user_invite", invite.ID, nil)
 }
 
+type PendingInvite struct {
+	ID           string    `json:"id"`
+	Email        string    `json:"email"`
+	Username     string    `json:"username"`
+	TenantRole   string    `json:"tenantRole"`
+	PlatformRole *string   `json:"platformRole"`
+	ExpiresAt    time.Time `json:"expiresAt"`
+}
+
+func ListPending(ctx context.Context, database *db.DB) ([]PendingInvite, error) {
+	organisation, err := org.Default(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := database.Query(ctx, `SELECT "id","email","username","tenantRole","platformRole","expiresAt" FROM "UserInvite" WHERE "organizationId"=? AND "revokedAt" IS NULL AND "redeemedAt" IS NULL AND "expiresAt">? ORDER BY "createdAt" DESC`, organisation.ID, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PendingInvite
+	for rows.Next() {
+		var row PendingInvite
+		var platform sql.NullString
+		if err := rows.Scan(&row.ID, &row.Email, &row.Username, &row.TenantRole, &platform, &row.ExpiresAt); err != nil {
+			return nil, err
+		}
+		if platform.Valid && platform.String != "" {
+			role := platform.String
+			row.PlatformRole = &role
+		}
+		out = append(out, row)
+	}
+	if out == nil {
+		out = []PendingInvite{}
+	}
+	return out, nil
+}
+
 func RevokeInvite(ctx context.Context, database *db.DB, inviteID string) error {
 	organisation, err := org.Default(ctx, database)
 	if err != nil {

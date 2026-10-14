@@ -25,6 +25,8 @@ export function AppsPage() {
         machineId: row.machineId,
         machineName: row.machine,
         addedBy: row.addedBy || "—",
+        createdById: row.createdById || "",
+        workspaces: row.workspaces ?? [],
       }))),
     ).catch(() => setApps([]));
   };
@@ -41,7 +43,7 @@ export function AppsPage() {
         ) : null}
       />
       <p className="mb-3 text-[12px] text-smoke">{apps.length} {apps.length === 1 ? "app" : "apps"}</p>
-      <AppsTable apps={apps} machines={machines} baseDomain={baseDomain} canManage={canManage} onDeleted={load} />
+      <AppsTable apps={apps} machines={machines} baseDomain={baseDomain} currentUserId={ctx.userId} onDeleted={load} />
     </div>
   );
 }

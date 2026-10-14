@@ -66,6 +66,10 @@ func (s *Store) CreateInvite(ctx context.Context, actorID, email, username, tena
 	return members.CreateInvite(ctx, s.DB, actorID, email, username, tenantRole, platformRole, groupIDs)
 }
 
+func (s *Store) PendingInvites(ctx context.Context) ([]members.PendingInvite, error) {
+	return members.ListPending(ctx, s.DB)
+}
+
 func (s *Store) FindInviteByCode(ctx context.Context, code string) (Invite, error) {
 	return members.FindInviteByCode(ctx, s.DB, code)
 }
@@ -118,8 +122,8 @@ func (s *Store) Policies(ctx context.Context) ([]PolicyView, error) {
 	return policy.List(ctx, s.DB)
 }
 
-func (s *Store) Apps(ctx context.Context) ([]AppRow, error) {
-	return apps.List(ctx, s.DB)
+func (s *Store) Apps(ctx context.Context, authz Capabilities) ([]AppRow, error) {
+	return apps.List(ctx, s.DB, authz.IsPlatformAdmin, authz.WorkspaceIDs)
 }
 
 func (s *Store) UpsertApp(ctx context.Context, actorID, appID, machineID, subdomain string, port int, status, lastError string) error {

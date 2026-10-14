@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -91,6 +92,9 @@ func (a *API) updateMachine(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !a.addedMachine(w, r, authz.UserID) {
+		return
+	}
 	var body struct {
 		Name         string   `json:"name"`
 		WorkspaceIDs []string `json:"workspaceIds"`
@@ -141,6 +145,9 @@ func (a *API) deleteMachine(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !a.addedMachine(w, r, authz.UserID) {
+		return
+	}
 	var hsID string
 	if err := a.Store.DB.QueryRow(r.Context(), `SELECT "headscaleNodeId" FROM "Machine" WHERE "id"=?`, r.PathValue("id")).Scan(&hsID); err != nil {
 		fail(w, http.StatusNotFound, "Machine not found")
@@ -157,6 +164,20 @@ func (a *API) deleteMachine(w http.ResponseWriter, r *http.Request) {
 	_ = a.Store.Audit(r.Context(), org.ID, authz.UserID, "machine.deleted", "NETWORK", "machine", r.PathValue("id"), nil)
 	a.Live.Publish("machines")
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) addedMachine(w http.ResponseWriter, r *http.Request, actorID string) bool {
+	var creator sql.NullString
+	err := a.Store.DB.QueryRow(r.Context(), `SELECT "createdById" FROM "Machine" WHERE "id"=?`, r.PathValue("id")).Scan(&creator)
+	if err != nil {
+		fail(w, http.StatusNotFound, "Machine not found")
+		return false
+	}
+	if !creator.Valid || creator.String != actorID {
+		fail(w, http.StatusForbidden, "Only the person who added this machine can change it.")
+		return false
+	}
+	return true
 }
 
 func (a *API) machineSnapshot(ctx context.Context, authz store.Capabilities) (store.MachinesTable, error) {

@@ -68,6 +68,7 @@ func (a *API) redeemInvite(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	a.Live.Publish("users")
 	a.setSession(w, r, userID)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -120,6 +121,7 @@ func (a *API) createInvite(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	a.Live.Publish("users")
 	writeJSON(w, http.StatusOK, map[string]any{"code": code, "id": inviteID, "email": email, "expiresAt": expires, "acceptPath": "/accept-invite"})
 }
 
@@ -131,7 +133,20 @@ func (a *API) revokeInvite(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	a.Live.Publish("users")
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) invites(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.require(w, r, "members.invite"); !ok {
+		return
+	}
+	rows, err := a.Store.PendingInvites(r.Context())
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
 }
 
 func (a *API) users(w http.ResponseWriter, r *http.Request) {

@@ -8,10 +8,11 @@ import (
 )
 
 func (a *API) apps(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.require(w, r, "network.view"); !ok {
+	authz, ok := a.require(w, r, "network.view")
+	if !ok {
 		return
 	}
-	rows, err := a.Store.Apps(r.Context())
+	rows, err := a.Store.Apps(r.Context(), authz)
 	if err != nil {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return

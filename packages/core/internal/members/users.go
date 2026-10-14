@@ -19,12 +19,15 @@ type User struct {
 }
 
 type Row struct {
-	ID       string   `json:"id"`
-	Username string   `json:"username"`
-	Email    string   `json:"email"`
-	Name     string   `json:"name"`
-	Role     string   `json:"role"`
-	Groups   []string `json:"workspaces"`
+	ID           string   `json:"id"`
+	Username     string   `json:"username"`
+	Email        string   `json:"email"`
+	Name         string   `json:"name"`
+	Role         string   `json:"role"`
+	RoleKey      string   `json:"roleKey"`
+	Joined       string   `json:"joined"`
+	WorkspaceIDs []string `json:"workspaceIds"`
+	Groups       []string `json:"workspaces"`
 }
 
 func Find(ctx context.Context, database *db.DB, ident string) (User, error) {
@@ -43,7 +46,7 @@ func ByID(ctx context.Context, database *db.DB, userID string) (User, error) {
 }
 
 func List(ctx context.Context, database *db.DB) ([]Row, error) {
-	rows, err := database.Query(ctx, `SELECT "id","username","email",COALESCE("name",'') FROM "User" ORDER BY "email" ASC`)
+	rows, err := database.Query(ctx, `SELECT "id","username","email",COALESCE("name",''),"createdAt" FROM "User" ORDER BY "email" ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +54,14 @@ func List(ctx context.Context, database *db.DB) ([]Row, error) {
 	var out []Row
 	for rows.Next() {
 		var row Row
-		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Name); err != nil {
+		var created sql.NullTime
+		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Name, &created); err != nil {
 			return nil, err
+		}
+		if created.Valid {
+			row.Joined = created.Time.UTC().Format("2 Jan 2006")
+		} else {
+			row.Joined = "—"
 		}
 		var platform, tenant sql.NullString
 		_ = database.QueryRow(ctx, `SELECT "role" FROM "PlatformMembership" WHERE "userId"=? AND "role"='OWNER'`, row.ID).Scan(&platform)
@@ -62,27 +71,31 @@ func List(ctx context.Context, database *db.DB) ([]Row, error) {
 		_ = database.QueryRow(ctx, `SELECT "role" FROM "TenantMembership" WHERE "userId"=? ORDER BY "createdAt" ASC LIMIT 1`, row.ID).Scan(&tenant)
 		switch {
 		case platform.String == "OWNER":
-			row.Role = "Owner"
+			row.Role, row.RoleKey = "Owner", "OWNER"
 		case platform.String == "SUPER_ADMIN":
-			row.Role = "Super admin"
+			row.Role, row.RoleKey = "Super admin", "SUPER_ADMIN"
 		case tenant.String == "ADMIN":
-			row.Role = "Admin"
+			row.Role, row.RoleKey = "Admin", "ADMIN"
 		case tenant.String == "MEMBER":
-			row.Role = "Member"
+			row.Role, row.RoleKey = "Member", "MEMBER"
 		default:
-			row.Role = "—"
+			row.Role, row.RoleKey = "—", "MEMBER"
 		}
-		grows, err := database.Query(ctx, `SELECT g."name" FROM "WorkspaceMembership" m JOIN "Group" g ON g."id"=m."groupId" WHERE m."userId"=? ORDER BY g."name"`, row.ID)
+		grows, err := database.Query(ctx, `SELECT g."id", g."name" FROM "WorkspaceMembership" m JOIN "Group" g ON g."id"=m."groupId" WHERE m."userId"=? ORDER BY g."name"`, row.ID)
 		if err == nil {
 			for grows.Next() {
-				var name string
-				_ = grows.Scan(&name)
+				var gid, name string
+				_ = grows.Scan(&gid, &name)
+				row.WorkspaceIDs = append(row.WorkspaceIDs, gid)
 				row.Groups = append(row.Groups, name)
 			}
 			grows.Close()
 		}
 		if row.Groups == nil {
 			row.Groups = []string{}
+		}
+		if row.WorkspaceIDs == nil {
+			row.WorkspaceIDs = []string{}
 		}
 		out = append(out, row)
 	}

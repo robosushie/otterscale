@@ -14,24 +14,28 @@ export type AppRow = {
   machineId: string;
   machineName: string;
   addedBy: string;
+  createdById: string;
+  workspaces: string[];
 };
 
 export function AppsTable({
   apps,
   machines,
   baseDomain,
-  canManage,
+  currentUserId,
   onDeleted,
 }: {
   apps: AppRow[];
   machines: { id: string; name: string }[];
   baseDomain: string;
-  canManage: boolean;
+  currentUserId: string;
   onDeleted?: () => void;
 }) {
   const [editing, setEditing] = useState<AppRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const canEdit = (app: AppRow) => Boolean(currentUserId) && app.createdById === currentUserId;
+  const showActions = apps.some(canEdit);
   const close = useCallback(() => {
     setEditing(null);
     setError(null);
@@ -61,8 +65,9 @@ export function AppsTable({
             <th>Machine</th>
             <th>Port</th>
             <th>Status</th>
+            <th>Workspace</th>
             <th>Added by</th>
-            {canManage ? <th className="actions"></th> : null}
+            {showActions ? <th className="actions"></th> : null}
           </tr>
         </thead>
         <tbody>
@@ -88,10 +93,14 @@ export function AppsTable({
                 </div>
               </td>
               <td>
+                <div className="cell">{app.workspaces.join(", ") || "—"}</div>
+              </td>
+              <td>
                 <div className="cell">{app.addedBy}</div>
               </td>
-              {canManage ? (
+              {showActions ? (
                 <td className="actions">
+                  {canEdit(app) ? (
                   <div className="cell-end">
                     <Button
                       type="button"
@@ -117,13 +126,16 @@ export function AppsTable({
                       <Trash2 className="size-3.5" />
                     </Button>
                   </div>
+                  ) : (
+                    <div className="cell-end" />
+                  )}
                 </td>
               ) : null}
             </tr>
           ))}
           {apps.length === 0 ? (
             <tr>
-              <td colSpan={canManage ? 6 : 5}>
+              <td colSpan={showActions ? 7 : 6}>
                 <div className="cell text-smoke">No published apps yet.</div>
               </td>
             </tr>

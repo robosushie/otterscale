@@ -50,6 +50,23 @@ func (a *API) live(w http.ResponseWriter, r *http.Request) {
 					send("workspaces", rows)
 				}
 			}
+		case "users":
+			if !has(authz.Capabilities, "members.view") {
+				return
+			}
+			rows, err := a.Store.Users(r.Context())
+			if err != nil {
+				return
+			}
+			var invites any = []struct{}{}
+			if has(authz.Capabilities, "members.invite") {
+				pending, err := a.Store.PendingInvites(r.Context())
+				if err != nil {
+					return
+				}
+				invites = pending
+			}
+			send("users", map[string]any{"users": rows, "invites": invites})
 		}
 	}
 	stop := a.Live.Subscribe(func(topic string) { push(topic) })
@@ -57,6 +74,9 @@ func (a *API) live(w http.ResponseWriter, r *http.Request) {
 	push("machines")
 	if has(authz.Capabilities, "workspace.manage") {
 		push("workspaces")
+	}
+	if has(authz.Capabilities, "members.view") {
+		push("users")
 	}
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()

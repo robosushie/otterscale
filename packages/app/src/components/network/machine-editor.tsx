@@ -12,18 +12,20 @@ export function MachinesTable({
   rows,
   workspaces,
   tags,
-  canManage,
+  currentUserId,
   onMutated,
 }: {
   rows: MachineRow[];
   workspaces: { id: string; name: string }[];
   tags: { id: string; name: string; aclTag: string }[];
-  canManage: boolean;
+  currentUserId: string;
   onMutated?: () => void;
 }) {
   const [editing, setEditing] = useState<MachineRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const canEdit = (row: MachineRow) => Boolean(currentUserId) && row.createdById === currentUserId;
+  const showActions = rows.some(canEdit);
   const close = useCallback(() => {
     setEditing(null);
     setError(null);
@@ -77,7 +79,7 @@ export function MachinesTable({
             <th>Tags</th>
             <th>Added by</th>
             <th>Last seen</th>
-            {canManage ? <th className="actions"></th> : null}
+            {showActions ? <th className="actions"></th> : null}
           </tr>
         </thead>
         <tbody>
@@ -107,8 +109,9 @@ export function MachinesTable({
               <td>
                 <div className="cell tabular-nums">{row.lastSeen}</div>
               </td>
-              {canManage ? (
+              {showActions ? (
                 <td className="actions">
+                  {canEdit(row) ? (
                   <div className="cell-end">
                     <Button
                       type="button"
@@ -134,13 +137,16 @@ export function MachinesTable({
                       <Trash2 className="size-3.5" />
                     </Button>
                   </div>
+                  ) : (
+                    <div className="cell-end" />
+                  )}
                 </td>
               ) : null}
             </tr>
           ))}
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={canManage ? 7 : 6} className="text-smoke">
+              <td colSpan={showActions ? 7 : 6} className="text-smoke">
                 <div className="cell text-smoke">No devices in your workspaces yet.</div>
               </td>
             </tr>

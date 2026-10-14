@@ -20,12 +20,56 @@ function roleLabel(invite: PendingInvite) {
   return "Member";
 }
 
+function InviteCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    const done = () => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    };
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(code).then(done).catch(() => copyFallback(code, done));
+      return;
+    }
+    copyFallback(code, done);
+  }
+
+  return (
+    <div className="rounded-[8px] border border-ash bg-periwinkle-mist p-4 text-sm">
+      <p className="font-[540]">Copy this invite code now. It will not be shown again.</p>
+      <div className="mt-2 flex items-start gap-3">
+        <p className="min-w-0 flex-1 break-all font-mono select-all">{code}</p>
+        <Button type="button" variant="secondary" onClick={copy}>
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <p className="mt-2 text-graphite">On the sign-in page, choose Create account and enter this code.</p>
+    </div>
+  );
+}
+
+function copyFallback(code: string, done: () => void) {
+  const field = document.createElement("textarea");
+  field.value = code;
+  field.setAttribute("readonly", "true");
+  field.style.position = "fixed";
+  field.style.left = "-9999px";
+  document.body.appendChild(field);
+  field.select();
+  document.execCommand("copy");
+  field.remove();
+  done();
+}
+
 export function InviteForm({
   workspaces,
   canAssignSuperAdmin,
+  onCreated,
 }: {
   workspaces: { id: string; name: string }[];
   canAssignSuperAdmin: boolean;
+  onCreated?: () => void;
 }) {
   const [lastInvite, setLastInvite] = useState<{ code: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +98,7 @@ export function InviteForm({
       setLastInvite(result.data);
       form.reset();
       setMenuKey((key) => key + 1);
+      onCreated?.();
     });
   }
 
@@ -87,13 +132,7 @@ export function InviteForm({
         </Button>
       </form>
       {error ? <p className="text-sm text-off-black">{error}</p> : null}
-      {lastInvite ? (
-        <div className="rounded-[8px] border border-ash bg-periwinkle-mist p-4 text-sm">
-          <p className="font-[540]">Copy this invite code now. It will not be shown again.</p>
-          <p className="mt-2 break-all font-mono">{lastInvite.code}</p>
-          <p className="mt-2 text-graphite">On the sign-in page, choose Create account and enter this code.</p>
-        </div>
-      ) : null}
+      {lastInvite ? <InviteCode code={lastInvite.code} /> : null}
     </div>
   );
 }

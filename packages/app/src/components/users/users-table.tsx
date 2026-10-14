@@ -13,6 +13,7 @@ export type UserRow = {
   roleKey: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "MEMBER";
   joined: string;
   workspaceIds: string[];
+  pending?: boolean;
 };
 
 export function UsersTable({
@@ -21,12 +22,14 @@ export function UsersTable({
   canManage,
   canAssignSuperAdmin,
   currentUserId,
+  onChanged,
 }: {
   users: UserRow[];
   workspaces: { id: string; name: string }[];
   canManage: boolean;
   canAssignSuperAdmin: boolean;
   currentUserId: string;
+  onChanged?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -39,7 +42,8 @@ export function UsersTable({
       (u) =>
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
-        u.role.toLowerCase().includes(q),
+        u.role.toLowerCase().includes(q) ||
+        u.joined.toLowerCase().includes(q),
     );
   }, [query, users]);
 
@@ -54,8 +58,22 @@ export function UsersTable({
           workspaceIds: formData.getAll("workspaceIds").map(String),
         });
         setEditingId(null);
+        onChanged?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save");
+      }
+    });
+  }
+
+  function onRevoke(user: UserRow) {
+    if (!confirm(`Revoke the invite for ${user.email}?`)) return;
+    startTransition(async () => {
+      setError(null);
+      try {
+        await api.revokeInvite(user.id);
+        onChanged?.();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not revoke");
       }
     });
   }
@@ -68,6 +86,7 @@ export function UsersTable({
       setError(null);
       try {
         await api.deleteUser(user.id);
+        onChanged?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not delete");
       }
@@ -99,6 +118,7 @@ export function UsersTable({
         <tbody>
           {filtered.map((user) => {
             const locked =
+              user.pending ||
               user.roleKey === "OWNER" ||
               user.id === currentUserId ||
               (user.roleKey === "SUPER_ADMIN" && !canAssignSuperAdmin);
@@ -142,7 +162,13 @@ export function UsersTable({
                 </td>
                 {canManage ? (
                   <td className="actions">
-                    {locked ? (
+                    {user.pending ? (
+                      <div className="cell-end">
+                        <Button type="button" variant="ghost" disabled={pending} onClick={() => onRevoke(user)}>
+                          Revoke
+                        </Button>
+                      </div>
+                    ) : locked ? (
                       <div className="cell-end" />
                     ) : editing ? (
                       <div className="cell-end">
