@@ -53,4 +53,4 @@ When unsure, read `docs/theme.md` before adding new components.
 
 ## Git commits
 
-Only commit when the user asks. Conventional commits per [`.agents/rules/git-commits.md`](./.agents/rules/git-commits.md) (`feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style`; imperative ≤72 chars; HEREDOC; no `--no-verify` unless the user asks).
+Only commit when the user asks. Conventional commits per [`.agents/rules/git-commits.md`](./.agents/rules/git-commits.md) (`feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style`; imperative subject and PR title limited to 72 characters; HEREDOC; no `--no-verify` unless the user asks).

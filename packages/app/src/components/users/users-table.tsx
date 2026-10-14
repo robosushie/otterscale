@@ -145,9 +145,9 @@ export function UsersTable({
                 { label: "Workspaces", value: user.workspaces.join(", ") || "—" },
                 { label: "Joined", value: user.joined },
               ]}
-              actions={userActions(user)}
+              actions={userActions(user, "card")}
             >
-              {editing ? userForm(user) : null}
+              {editing ? userForm(user, "card") : null}
             </RecordCard>
           );
         })}
@@ -173,7 +173,7 @@ export function UsersTable({
                     <div className="cell-stack">
                       <p className="font-medium">{user.name}</p>
                       <p className="text-smoke">{user.email}</p>
-                      {editing ? userForm(user) : null}
+                      {editing ? userForm(user, "table") : null}
                     </div>
                   </td>
                   <td>
@@ -185,7 +185,7 @@ export function UsersTable({
                   <td>
                     <div className="cell tabular-nums">{user.joined}</div>
                   </td>
-                  {canManage ? <td className="actions">{userActions(user)}</td> : null}
+                  {canManage ? <td className="actions">{userActions(user, "table")}</td> : null}
                 </tr>
               );
             })}
@@ -202,9 +202,9 @@ export function UsersTable({
     </div>
   );
 
-  function userForm(user: UserRow) {
+  function userForm(user: UserRow, layout: "card" | "table") {
     return (
-      <form id={`user-${user.id}`} onSubmit={onSave} className="mt-3 flex max-w-md flex-col gap-3">
+      <form id={`user-${user.id}-${layout}`} onSubmit={onSave} className="mt-3 flex max-w-md flex-col gap-3">
         <input type="hidden" name="userId" value={user.id} />
         {user.pending ? <input type="hidden" name="pending" value="1" /> : null}
         {user.pending ? null : (
@@ -231,7 +231,7 @@ export function UsersTable({
     );
   }
 
-  function userActions(user: UserRow) {
+  function userActions(user: UserRow, layout: "card" | "table") {
     if (!canManage) return null;
     const locked =
       user.roleKey === "OWNER" ||
@@ -241,7 +241,7 @@ export function UsersTable({
     if (user.pending) {
       return editing ? (
         <div className="cell-end">
-          <Button type="submit" form={`user-${user.id}`} variant="secondary" icon aria-label={`Save ${user.name}`} disabled={pending}>
+          <Button type="submit" form={`user-${user.id}-${layout}`} variant="secondary" icon aria-label={`Save ${user.name}`} disabled={pending}>
             <Save className="size-3.5" />
           </Button>
           <Button type="button" variant="ghost" disabled={pending} onClick={() => setEditingId(null)}>
@@ -263,7 +263,7 @@ export function UsersTable({
     if (editing) {
       return (
         <div className="cell-end">
-          <Button type="submit" form={`user-${user.id}`} variant="secondary" icon aria-label={`Save ${user.name}`} disabled={pending}>
+          <Button type="submit" form={`user-${user.id}-${layout}`} variant="secondary" icon aria-label={`Save ${user.name}`} disabled={pending}>
             <Save className="size-3.5" />
           </Button>
           <Button type="button" variant="ghost" disabled={pending} onClick={() => setEditingId(null)}>

@@ -28,7 +28,7 @@ UI and styling follow the light editorial theme in `docs/theme.md`.
 
 ## Git commits
 
-Only commit when the user asks. Conventional commits: `feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style` — imperative subject ≤72 chars, body explains why.
+Only commit when the user asks. Conventional commits: `feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style` — imperative subject and PR title are limited to 72 characters (CI commits fails longer ones); body explains why.
 
 | Resource | Purpose |
 |----------|---------|

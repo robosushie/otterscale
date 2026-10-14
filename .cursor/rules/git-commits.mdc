@@ -17,7 +17,8 @@ Optional body: why, not a file list.
 
 Types: `feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style`
 
-- Imperative, ≤72 chars, no trailing period
+- Imperative, no trailing period
+- Subject and PR title are limited to 72 characters. CI commits fails the PR when either is longer. Extra detail goes in the body.
 - One logical change; HEREDOC for the message
 - No `--no-verify` / amend-pushed unless user asks
 
@@ -28,6 +29,9 @@ Subject is the IdP sub so console and API share identity.
 ```
 
 ```text
+# ❌ BAD — over 72 characters
+feat: add workspaces field to user invites and enhance user management components
+
 # ❌ BAD
 Updated files and fixed stuff
 ```
