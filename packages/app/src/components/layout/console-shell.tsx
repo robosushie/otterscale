@@ -43,7 +43,6 @@ export function ConsoleShell({
             ) : null}
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            <p className="mb-3 truncate px-3.5 text-[12px] text-smoke">{ctx.email}</p>
             <ConsoleNav capabilities={ctx.capabilities} />
           </div>
           {account}
