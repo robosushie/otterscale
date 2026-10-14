@@ -1,0 +1,86 @@
+name: CI commits
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  semantic:
+    name: semantic
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check conventional messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          git fetch --no-tags origin "$BASE_SHA"
+          python3 << 'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+
+          TYPES = "feat|fix|refactor|chore|docs|test|style"
+          HEADER = re.compile(
+              rf"^(?:{TYPES})(?:\([A-Za-z0-9][A-Za-z0-9._/-]*\))?: \S(?:.*\S)?$"
+          )
+          REVERT = re.compile(r'^Revert ".+"$')
+
+          def problems(text):
+              if len(text) > 72:
+                  return f"is {len(text)} characters; the limit is 72"
+              if text.endswith("."):
+                  return "ends with a period"
+              if HEADER.match(text) or REVERT.match(text):
+                  return None
+              return (
+                  "must look like feat(scope): imperative summary "
+                  "using feat, fix, refactor, chore, docs, test, or style"
+              )
+
+          def fail(label, text, reason):
+              print(f"::error::{label} {reason}: {text}")
+              return 1
+
+          failed = 0
+          title = os.environ["PR_TITLE"].splitlines()[0].strip()
+          reason = problems(title)
+          if reason:
+              failed += fail("PR title", title, reason)
+
+          log = subprocess.run(
+              [
+                  "git",
+                  "log",
+                  "--no-merges",
+                  "--format=%s",
+                  f"{os.environ['BASE_SHA']}..{os.environ['HEAD_SHA']}",
+              ],
+              check=True,
+              capture_output=True,
+              text=True,
+          )
+          subjects = [line for line in log.stdout.splitlines() if line.strip()]
+          if not subjects:
+              print("::error::Pull request has no commits to check")
+              failed += 1
+          for subject in subjects:
+              reason = problems(subject.strip())
+              if reason:
+                  failed += fail("Commit subject", subject.strip(), reason)
+
+          if failed:
+              sys.exit(1)
+          print(f"Checked PR title and {len(subjects)} commit subject(s).")
+          PY

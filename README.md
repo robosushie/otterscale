@@ -4,6 +4,7 @@ Self-hosted team mesh control. No per-seat lock-in. A console on [Headscale](htt
 
 [![CI console](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml)
 [![CI Go](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml)
+[![CI commits](https://github.com/robosushie/otterscale/actions/workflows/ci-commits.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-commits.yml)
 [![GitHub Pages](https://github.com/robosushie/otterscale/actions/workflows/pages.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/pages.yml)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](./LICENSE)
 
@@ -170,7 +171,7 @@ Schema changes are goose SQL under `packages/core/migrations`. Core applies them
 
 UI follows [docs/theme.md](./docs/theme.md): parchment canvas, Newsreader weight 400, IBM Plex Mono, one Lake Blue primary CTA.
 
-Commits use conventional types: `feat` · `fix` · `refactor` · `chore` · `docs` · `test` · `style`. Pull requests must pass **CI console** and **CI Go**. Do not commit secrets.
+Commits use conventional types: `feat` · `fix` · `refactor` · `chore` · `docs` · `test` · `style`. Pull requests must pass **CI console**, **CI Go**, and **CI commits**. Do not commit secrets.
 
 Coding agents: [AGENTS.md](./AGENTS.md).
 
