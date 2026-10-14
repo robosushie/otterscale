@@ -1,8 +1,6 @@
 name: CI console
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -25,6 +23,12 @@ jobs:
 
       - name: Install
         run: pnpm install
+
+      - name: Typecheck
+        run: pnpm --filter @otterscale/app exec tsc --noEmit
+
+      - name: Build
+        run: pnpm build
 
       - name: Test
         run: pnpm test

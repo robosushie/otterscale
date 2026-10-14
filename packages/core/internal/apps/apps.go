@@ -78,7 +78,7 @@ func addedBy(name, username, email string) string {
 	return "—"
 }
 
-func assertAddedBy(ctx context.Context, database *db.DB, appID, actorID string) error {
+func assertCanChange(ctx context.Context, database *db.DB, appID, actorID string, steward bool) error {
 	var creator sql.NullString
 	err := database.QueryRow(ctx, `SELECT "createdById" FROM "PublishedApp" WHERE "id"=?`, appID).Scan(&creator)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -87,10 +87,10 @@ func assertAddedBy(ctx context.Context, database *db.DB, appID, actorID string) 
 	if err != nil {
 		return err
 	}
-	if !creator.Valid || creator.String != actorID {
-		return errors.New("Only the person who added this app can change it.")
+	if steward || (creator.Valid && creator.String == actorID) {
+		return nil
 	}
-	return nil
+	return errors.New("Only an admin or the person who added this app can change it.")
 }
 
 func appWorkspaces(ctx context.Context, database *db.DB, machineID string) (ids, names []string) {
@@ -116,13 +116,13 @@ func appWorkspaces(ctx context.Context, database *db.DB, machineID string) (ids,
 	return ids, names
 }
 
-func Upsert(ctx context.Context, database *db.DB, actorID, appID, machineID, subdomain string, port int, status, lastError string) error {
+func Upsert(ctx context.Context, database *db.DB, actorID, appID, machineID, subdomain string, port int, status, lastError string, steward bool) error {
 	organisation, err := org.Default(ctx, database)
 	if err != nil {
 		return err
 	}
 	if appID != "" {
-		if err := assertAddedBy(ctx, database, appID, actorID); err != nil {
+		if err := assertCanChange(ctx, database, appID, actorID, steward); err != nil {
 			return err
 		}
 	}
@@ -141,12 +141,30 @@ func Upsert(ctx context.Context, database *db.DB, actorID, appID, machineID, sub
 	return WriteRoutes(ctx, database, organisation)
 }
 
-func Delete(ctx context.Context, database *db.DB, actorID, appID string) error {
+func SetStatus(ctx context.Context, database *db.DB, actorID, appID, status string, steward bool) error {
 	organisation, err := org.Default(ctx, database)
 	if err != nil {
 		return err
 	}
-	if err := assertAddedBy(ctx, database, appID, actorID); err != nil {
+	if status != "ACTIVE" && status != "DISABLED" {
+		return errors.New("Invalid status")
+	}
+	if err := assertCanChange(ctx, database, appID, actorID, steward); err != nil {
+		return err
+	}
+	if _, err := database.Exec(ctx, `UPDATE "PublishedApp" SET "status"=?,"updatedAt"=? WHERE "id"=? AND "organizationId"=?`, status, time.Now().UTC(), appID, organisation.ID); err != nil {
+		return err
+	}
+	_ = audit.Append(ctx, database, organisation.ID, actorID, "app.status", "NETWORK", "published_app", appID, map[string]any{"status": status})
+	return WriteRoutes(ctx, database, organisation)
+}
+
+func Delete(ctx context.Context, database *db.DB, actorID, appID string, steward bool) error {
+	organisation, err := org.Default(ctx, database)
+	if err != nil {
+		return err
+	}
+	if err := assertCanChange(ctx, database, appID, actorID, steward); err != nil {
 		return err
 	}
 	if _, err := database.Exec(ctx, `DELETE FROM "PublishedApp" WHERE "id"=? AND "organizationId"=?`, appID, organisation.ID); err != nil {

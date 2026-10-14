@@ -126,12 +126,16 @@ func (s *Store) Apps(ctx context.Context, authz Capabilities) ([]AppRow, error) 
 	return apps.List(ctx, s.DB, authz.IsPlatformAdmin, authz.WorkspaceIDs)
 }
 
-func (s *Store) UpsertApp(ctx context.Context, actorID, appID, machineID, subdomain string, port int, status, lastError string) error {
-	return apps.Upsert(ctx, s.DB, actorID, appID, machineID, subdomain, port, status, lastError)
+func (s *Store) UpsertApp(ctx context.Context, actorID, appID, machineID, subdomain string, port int, status, lastError string, steward bool) error {
+	return apps.Upsert(ctx, s.DB, actorID, appID, machineID, subdomain, port, status, lastError, steward)
 }
 
-func (s *Store) DeleteApp(ctx context.Context, actorID, appID string) error {
-	return apps.Delete(ctx, s.DB, actorID, appID)
+func (s *Store) DeleteApp(ctx context.Context, actorID, appID string, steward bool) error {
+	return apps.Delete(ctx, s.DB, actorID, appID, steward)
+}
+
+func (s *Store) SetAppStatus(ctx context.Context, actorID, appID, status string, steward bool) error {
+	return apps.SetStatus(ctx, s.DB, actorID, appID, status, steward)
 }
 
 func (s *Store) WriteAppRoutes(ctx context.Context, organisation Org) error {
@@ -206,6 +210,15 @@ func (s *Store) UserIDForSession(ctx context.Context, token string) (string, err
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	_, err := s.DB.Exec(ctx, `DELETE FROM "Session" WHERE "sessionToken"=?`, token)
 	return err
+}
+
+func (s *Store) DeleteUserSessions(ctx context.Context, userID string) error {
+	_, err := s.DB.Exec(ctx, `DELETE FROM "Session" WHERE "userId"=?`, userID)
+	return err
+}
+
+func (s *Store) ReplaceInviteWorkspaces(ctx context.Context, inviteID string, groupIDs []string) error {
+	return members.ReplaceInviteWorkspaces(ctx, s.DB, inviteID, groupIDs)
 }
 
 type Capabilities struct {

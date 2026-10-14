@@ -18,7 +18,8 @@ Optional body: why, not a file list.
 
 ## Rules
 
-- Imperative mood, ≤72 characters in the subject, no trailing period
+- Imperative mood, no trailing period
+- **Subject length is hard-limited to 72 characters**, including the type and scope. CI commits rejects a longer pull request title and every commit subject on the PR. Put the rest in the body.
 - One logical change per commit
 - Pass the message via HEREDOC (shell)
 - No `--no-verify` or amend-after-push unless the user explicitly asks
@@ -32,6 +33,9 @@ Subject is the IdP sub so console and API share identity.
 ```
 
 ```text
+# ❌ BAD — 81 characters; CI commits fails
+feat: add workspaces field to user invites and enhance user management components
+
 # ❌ BAD
 Updated files and fixed stuff
 ```

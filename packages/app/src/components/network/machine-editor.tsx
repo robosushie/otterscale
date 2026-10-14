@@ -1,10 +1,13 @@
 import { useCallback, useState, useTransition, type FormEvent } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Ban, Pencil, Trash2 } from "lucide-react";
 import { api, type MachineRow } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { CheckMenu } from "@/components/ui/check-menu";
 import { Field, Input } from "@/components/ui/field";
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
 import { SidePanel } from "@/components/ui/side-panel";
+import { useCapabilities } from "@/hooks/use-capabilities";
+import { isSteward } from "@/types/roles";
 
 export type { MachineRow } from "@/api/client";
 
@@ -24,8 +27,10 @@ export function MachinesTable({
   const [editing, setEditing] = useState<MachineRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const canEdit = (row: MachineRow) => Boolean(currentUserId) && row.createdById === currentUserId;
-  const showActions = rows.some(canEdit);
+  const ctx = useCapabilities();
+  const steward = isSteward(ctx);
+  const canChange = (row: MachineRow) => steward || (Boolean(currentUserId) && row.createdById === currentUserId);
+  const showActions = rows.some(canChange);
   const close = useCallback(() => {
     setEditing(null);
     setError(null);
@@ -51,10 +56,26 @@ export function MachinesTable({
     });
   }
 
+  function onDisable(row: MachineRow) {
+    const next = !row.disabled;
+    if (!confirm(next ? `Disable ${row.name}? The device drops off the tailnet until it is enabled again.` : `Enable ${row.name}?`)) return;
+    startTransition(async () => {
+      setError(null);
+      try {
+        const result = await api.setMachineDisabled(row.machineId, next);
+        if (!next && result.reauthenticate) {
+          setError(`${row.name} is enabled. The device must run tailscale up again before it reconnects.`);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not update the machine");
+        return;
+      }
+      onMutated?.();
+    });
+  }
+
   function onDelete(row: MachineRow) {
     if (!confirm(`Delete ${row.name}? This removes the node from Headscale.`)) return;
-    const fd = new FormData();
-    fd.set("machineId", row.machineId);
     startTransition(async () => {
       setError(null);
       try {
@@ -67,9 +88,68 @@ export function MachinesTable({
     });
   }
 
+  function machineActions(row: MachineRow) {
+    return (
+      <div className="cell-end">
+        <Button
+          type="button"
+          variant="secondary"
+          icon
+          aria-label={`Edit ${row.name}`}
+          disabled={pending}
+          onClick={() => {
+            setError(null);
+            setEditing(row);
+          }}
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          icon
+          aria-label={row.disabled ? `Enable ${row.name}` : `Disable ${row.name}`}
+          disabled={pending}
+          onClick={() => onDisable(row)}
+        >
+          <Ban className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          icon
+          aria-label={`Delete ${row.name}`}
+          disabled={pending}
+          onClick={() => onDelete(row)}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
       {error && !editing ? <p className="mb-3 text-sm text-off-black">{error}</p> : null}
+      <RecordCards>
+        {rows.map((row) => (
+          <RecordCard
+            key={row.machineId}
+            title={row.disabled ? `${row.name} · Disabled` : row.name}
+            rows={[
+              { label: "Addresses", value: row.addresses || "—" },
+              { label: "Workspaces", value: row.workspaceNames.join(", ") || "Unassigned" },
+              { label: "Tags", value: row.tagNames.join(", ") || "—" },
+              { label: "Added by", value: row.addedBy || "—" },
+              { label: "Last seen", value: row.lastSeen || "—" },
+              { label: "Status", value: row.disabled ? "Disabled" : row.online ? "Online" : "Offline" },
+            ]}
+            actions={canChange(row) ? machineActions(row) : null}
+          />
+        ))}
+      </RecordCards>
+      {rows.length === 0 ? <p className="text-sm text-smoke lg:hidden">No devices in your workspaces yet.</p> : null}
+      <div className="hidden lg:block">
       <table className="console-table w-full text-left text-sm">
         <thead>
           <tr className="border-b border-ash">
@@ -91,7 +171,7 @@ export function MachinesTable({
                     className={`inline-block h-2 w-2 shrink-0 rounded-full ${row.online ? "bg-lake-blue" : "bg-ash"}`}
                     aria-label={row.online ? "Online" : "Offline"}
                   />
-                  <span className="font-medium">{row.name}</span>
+                  <span className="font-medium">{row.disabled ? `${row.name} · Disabled` : row.name}</span>
                 </div>
               </td>
               <td>
@@ -111,32 +191,8 @@ export function MachinesTable({
               </td>
               {showActions ? (
                 <td className="actions">
-                  {canEdit(row) ? (
-                  <div className="cell-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      icon
-                      aria-label={`Edit ${row.name}`}
-                      disabled={pending}
-                      onClick={() => {
-                        setError(null);
-                        setEditing(row);
-                      }}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      icon
-                      aria-label={`Delete ${row.name}`}
-                      disabled={pending}
-                      onClick={() => onDelete(row)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
+                  {canChange(row) ? (
+                  machineActions(row)
                   ) : (
                     <div className="cell-end" />
                   )}
@@ -153,6 +209,7 @@ export function MachinesTable({
           ) : null}
         </tbody>
       </table>
+      </div>
 
       <SidePanel open={Boolean(editing)} title={editing ? `Edit ${editing.name}` : "Edit machine"} onClose={close}>
         {editing ? (

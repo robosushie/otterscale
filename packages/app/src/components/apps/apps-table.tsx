@@ -1,9 +1,12 @@
 import { useCallback, useState, useTransition } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Ban, Pencil, Trash2 } from "lucide-react";
 import { api } from "@/api/client";
-import { Button } from "@/components/ui/button";
-import { SidePanel } from "@/components/ui/side-panel";
 import { AppForm } from "@/components/apps/app-form";
+import { Button } from "@/components/ui/button";
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
+import { SidePanel } from "@/components/ui/side-panel";
+import { useCapabilities } from "@/hooks/use-capabilities";
+import { isSteward } from "@/types/roles";
 
 export type AppRow = {
   id: string;
@@ -34,12 +37,29 @@ export function AppsTable({
   const [editing, setEditing] = useState<AppRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const canEdit = (app: AppRow) => Boolean(currentUserId) && app.createdById === currentUserId;
-  const showActions = apps.some(canEdit);
+  const ctx = useCapabilities();
+  const steward = isSteward(ctx);
+  const canChange = (app: AppRow) => steward || (Boolean(currentUserId) && app.createdById === currentUserId);
+  const showActions = apps.some(canChange);
   const close = useCallback(() => {
     setEditing(null);
     setError(null);
   }, []);
+
+  function onDisable(app: AppRow) {
+    const next = app.status !== "DISABLED";
+    if (!confirm(next ? `Disable ${app.subdomain}? It drops out of the edge routes.` : `Enable ${app.subdomain}?`)) return;
+    startTransition(async () => {
+      setError(null);
+      try {
+        await api.setAppDisabled(app.id, next);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not update the app");
+        return;
+      }
+      onDeleted?.();
+    });
+  }
 
   function onDelete(app: AppRow) {
     if (!confirm(`Delete ${app.subdomain}.${baseDomain}?`)) return;
@@ -55,9 +75,67 @@ export function AppsTable({
     });
   }
 
+  function appActions(app: AppRow) {
+    return (
+      <div className="cell-end">
+        <Button
+          type="button"
+          variant="secondary"
+          icon
+          aria-label={`Edit ${app.subdomain}`}
+          disabled={pending}
+          onClick={() => {
+            setError(null);
+            setEditing(app);
+          }}
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          icon
+          aria-label={app.status === "DISABLED" ? `Enable ${app.subdomain}` : `Disable ${app.subdomain}`}
+          disabled={pending}
+          onClick={() => onDisable(app)}
+        >
+          <Ban className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          icon
+          aria-label={`Delete ${app.subdomain}`}
+          disabled={pending}
+          onClick={() => onDelete(app)}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
       {error && !editing ? <p className="mb-3 text-sm text-off-black">{error}</p> : null}
+      <RecordCards>
+        {apps.map((app) => (
+          <RecordCard
+            key={app.id}
+            title={`${app.subdomain}.${baseDomain}`}
+            rows={[
+              { label: "Machine", value: app.machineName },
+              { label: "Port", value: app.port },
+              { label: "Status", value: app.status === "DISABLED" ? "Disabled" : app.lastError ? `${app.status} · ${app.lastError}` : app.status },
+              { label: "Workspace", value: app.workspaces.join(", ") || "—" },
+              { label: "Added by", value: app.addedBy || "—" },
+            ]}
+            actions={canChange(app) ? appActions(app) : null}
+          />
+        ))}
+      </RecordCards>
+      {apps.length === 0 ? <p className="text-sm text-smoke lg:hidden">No published apps yet.</p> : null}
+      <div className="hidden lg:block">
       <table className="console-table w-full text-left text-sm">
         <thead>
           <tr className="border-b border-ash">
@@ -100,32 +178,8 @@ export function AppsTable({
               </td>
               {showActions ? (
                 <td className="actions">
-                  {canEdit(app) ? (
-                  <div className="cell-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      icon
-                      aria-label={`Edit ${app.subdomain}`}
-                      disabled={pending}
-                      onClick={() => {
-                        setError(null);
-                        setEditing(app);
-                      }}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      icon
-                      aria-label={`Delete ${app.subdomain}`}
-                      disabled={pending}
-                      onClick={() => onDelete(app)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
+                  {canChange(app) ? (
+                  appActions(app)
                   ) : (
                     <div className="cell-end" />
                   )}
@@ -142,6 +196,7 @@ export function AppsTable({
           ) : null}
         </tbody>
       </table>
+      </div>
 
       <SidePanel open={Boolean(editing)} title={editing ? `Edit ${editing.subdomain}` : "Edit app"} onClose={close}>
         {editing ? (

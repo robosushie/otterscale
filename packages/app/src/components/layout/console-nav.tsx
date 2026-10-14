@@ -81,11 +81,13 @@ function GroupSection({
   capabilities,
   pathname,
   defaultOpen,
+  onNavigate,
 }: {
   group: NavGroup;
   capabilities: Capability[];
   pathname: string;
   defaultOpen: boolean;
+  onNavigate?: () => void;
 }) {
   const children = visibleChildren(group, capabilities);
   const [open, setOpen] = useState(defaultOpen);
@@ -112,6 +114,7 @@ function GroupSection({
             <Link
               key={c.href}
               to={c.href}
+              onClick={onNavigate}
               className={linkClass(pathname === c.href || pathname.startsWith(`${c.href}/`), true)}
               aria-current={pathname === c.href ? "page" : undefined}
             >
@@ -124,7 +127,7 @@ function GroupSection({
   );
 }
 
-export function ConsoleNav({ capabilities }: { capabilities: Capability[] }) {
+export function ConsoleNav({ capabilities, onNavigate }: { capabilities: Capability[]; onNavigate?: () => void }) {
   const pathname = useLocation().pathname;
 
   return (
@@ -137,6 +140,7 @@ export function ConsoleNav({ capabilities }: { capabilities: Capability[] }) {
             <Link
               key={item.href}
               to={item.href}
+              onClick={onNavigate}
               className={linkClass(active, false)}
               aria-current={active ? "page" : undefined}
             >
@@ -153,6 +157,7 @@ export function ConsoleNav({ capabilities }: { capabilities: Capability[] }) {
             capabilities={capabilities}
             pathname={pathname}
             defaultOpen={item.group.id === "network" || childActive}
+            onNavigate={onNavigate}
           />
         );
       })}
@@ -160,11 +165,11 @@ export function ConsoleNav({ capabilities }: { capabilities: Capability[] }) {
   );
 }
 
-export function ConsoleWordmark({ children }: { children: ReactNode }) {
+export function ConsoleWordmark({ children }: { children?: ReactNode }) {
   return (
     <Link to="/machines" className="flex min-w-0 items-center gap-2 px-2 py-1.5">
       <BrandLockup />
-      <span className="truncate text-[13px] text-graphite">{children}</span>
+      {children ? <span className="truncate text-[13px] text-graphite">{children}</span> : null}
     </Link>
   );
 }
