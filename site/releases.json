@@ -1,8 +1,10 @@
 {
-  "latest": "0.1.0",
-  "previous": null,
-  "history": [],
-  "sha": "c1875d7",
+  "latest": "0.1.1",
+  "previous": "0.1.0",
+  "history": [
+    "0.1.0"
+  ],
+  "sha": "bcfee4b",
   "prefix": "ghcr.io/robosushie/otterscale",
   "standalone": [
     "standalone"
