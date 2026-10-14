@@ -95,7 +95,7 @@ export const api = {
   createInvite: (body: { email: string; username: string; role: string; workspaceIds: string[] }) =>
     request<{ id?: string; code: string; email: string; acceptPath: string; expiresAt?: string }>("/api/users/invites", { method: "POST", body: JSON.stringify(body) }),
   invites: () =>
-    request<{ id: string; email: string; username: string; tenantRole: string; platformRole: string | null; expiresAt: string }[]>("/api/users/invites"),
+    request<{ id: string; email: string; username: string; tenantRole: string; platformRole: string | null; expiresAt: string; workspaceIds?: string[]; workspaces?: string[] }[]>("/api/users/invites"),
   revokeInvite: (id: string) => request(`/api/users/invites/${id}/revoke`, { method: "POST", body: "{}" }),
   audit: (category: "SYSTEM" | "NETWORK") => request<{ id: string; action: string; actor: string; createdAt: string }[]>(`/api/audit?category=${category}`),
   settings: () => request<{ name: string; appsBaseDomain: string; defaultAuthKeyExpiryHours: number }>("/api/settings"),

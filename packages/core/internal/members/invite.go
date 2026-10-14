@@ -156,6 +156,8 @@ type PendingInvite struct {
 	TenantRole   string    `json:"tenantRole"`
 	PlatformRole *string   `json:"platformRole"`
 	ExpiresAt    time.Time `json:"expiresAt"`
+	WorkspaceIDs []string  `json:"workspaceIds"`
+	Workspaces   []string  `json:"workspaces"`
 }
 
 func ListPending(ctx context.Context, database *db.DB) ([]PendingInvite, error) {
@@ -178,6 +180,25 @@ func ListPending(ctx context.Context, database *db.DB) ([]PendingInvite, error) 
 		if platform.Valid && platform.String != "" {
 			role := platform.String
 			row.PlatformRole = &role
+		}
+		row.WorkspaceIDs = []string{}
+		row.Workspaces = []string{}
+		memberships, qerr := database.Query(ctx, `SELECT g."id", g."name" FROM "UserInviteWorkspace" m JOIN "Group" g ON g."id"=m."groupId" WHERE m."inviteId"=? ORDER BY g."name"`, row.ID)
+		if qerr == nil {
+			for memberships.Next() {
+				var groupID, name string
+				if err := memberships.Scan(&groupID, &name); err != nil {
+					memberships.Close()
+					return nil, err
+				}
+				row.WorkspaceIDs = append(row.WorkspaceIDs, groupID)
+				row.Workspaces = append(row.Workspaces, name)
+			}
+			if err := memberships.Err(); err != nil {
+				memberships.Close()
+				return nil, err
+			}
+			memberships.Close()
 		}
 		out = append(out, row)
 	}

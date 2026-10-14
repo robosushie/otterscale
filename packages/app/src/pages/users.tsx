@@ -30,6 +30,7 @@ function rowsFrom(users: Awaited<ReturnType<typeof api.users>>): UserRow[] {
     roleKey: roleKeyFor(user.roleKey || user.role, null),
     joined: user.joined || "—",
     workspaceIds: user.workspaceIds ?? [],
+    workspaces: user.workspaces ?? [],
   }));
 }
 
@@ -38,18 +39,18 @@ export function UsersPage({ title = "Users", description = "People on this tailn
   const canInvite = ctx.capabilities.includes("members.invite");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>([]);
-  const [invites, setInvites] = useState<{ id: string; email: string; username: string; tenantRole: string; platformRole: string | null; expiresAt: Date }[]>([]);
+  const [invites, setInvites] = useState<{ id: string; email: string; username: string; tenantRole: string; platformRole: string | null; expiresAt: Date; workspaces: string[] }[]>([]);
   const load = useCallback(() => {
     void api.users().then((rows) => setUsers(rowsFrom(rows))).catch(() => setUsers([]));
     void api.workspaces().then((rows) => setWorkspaces(rows.map((row) => ({ id: row.id, name: row.name })))).catch(() => undefined);
     if (canInvite) {
-      void api.invites().then((rows) => setInvites(rows.map((row) => ({ ...row, expiresAt: new Date(row.expiresAt) })))).catch(() => setInvites([]));
+      void api.invites().then((rows) => setInvites(rows.map((row) => ({ ...row, expiresAt: new Date(row.expiresAt), workspaces: row.workspaces ?? [] })))).catch(() => setInvites([]));
     }
   }, [canInvite]);
   useEffect(load, [load]);
   const applyLive = useCallback((payload: { users: Awaited<ReturnType<typeof api.users>>; invites: Awaited<ReturnType<typeof api.invites>> }) => {
     setUsers(rowsFrom(payload.users ?? []));
-    setInvites((payload.invites ?? []).map((row) => ({ ...row, expiresAt: new Date(row.expiresAt) })));
+    setInvites((payload.invites ?? []).map((row) => ({ ...row, expiresAt: new Date(row.expiresAt), workspaces: row.workspaces ?? [] })));
   }, []);
   useLive("users", applyLive);
   if (requireInvite && !canInvite) return null;
@@ -75,6 +76,7 @@ export function UsersPage({ title = "Users", description = "People on this tailn
             roleKey: roleKeyFor(invite.tenantRole, invite.platformRole),
             joined: "Invited",
             workspaceIds: [] as string[],
+            workspaces: invite.workspaces,
             pending: true,
           })),
         ]}

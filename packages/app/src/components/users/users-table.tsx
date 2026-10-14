@@ -13,6 +13,7 @@ export type UserRow = {
   roleKey: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "MEMBER";
   joined: string;
   workspaceIds: string[];
+  workspaces: string[];
   pending?: boolean;
 };
 
@@ -43,7 +44,8 @@ export function UsersTable({
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q) ||
-        u.joined.toLowerCase().includes(q),
+        u.joined.toLowerCase().includes(q) ||
+        u.workspaces.some((name) => name.toLowerCase().includes(q)),
     );
   }, [query, users]);
 
@@ -111,6 +113,7 @@ export function UsersTable({
           <tr className="border-b border-ash">
             <th>User</th>
             <th>Role</th>
+            <th>Workspaces</th>
             <th>Joined</th>
             {canManage ? <th className="actions"></th> : null}
           </tr>
@@ -156,6 +159,9 @@ export function UsersTable({
                 </td>
                 <td>
                   <div className="cell">{user.role}</div>
+                </td>
+                <td>
+                  <div className="cell">{user.workspaces.join(", ") || "—"}</div>
                 </td>
                 <td>
                   <div className="cell tabular-nums">{user.joined}</div>
@@ -217,7 +223,7 @@ export function UsersTable({
           })}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={canManage ? 4 : 3}>
+              <td colSpan={canManage ? 5 : 4}>
                 <div className="cell text-smoke">No users match this search.</div>
               </td>
             </tr>
