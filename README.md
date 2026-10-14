@@ -2,7 +2,7 @@
 
 Self-hosted team mesh control. No per-seat lock-in. A console on [Headscale](https://github.com/juanfont/headscale) for workspaces, tags, keys, and Network Apps — people join with **official Tailscale clients** only.
 
-[![CI console](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-nextjs.yml)
+[![CI console](https://github.com/robosushie/otterscale/actions/workflows/ci-console.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-console.yml)
 [![CI Go](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-go.yml)
 [![CI commits](https://github.com/robosushie/otterscale/actions/workflows/ci-commits.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/ci-commits.yml)
 [![GitHub Pages](https://github.com/robosushie/otterscale/actions/workflows/pages.yml/badge.svg)](https://github.com/robosushie/otterscale/actions/workflows/pages.yml)
