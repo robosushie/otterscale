@@ -198,6 +198,66 @@ func (c *Client) RenameNode(ctx context.Context, nodeID, name string) error {
 	return nil
 }
 
+func (c *Client) ExpireNode(ctx context.Context, nodeID string) error {
+	return c.postExpire(ctx, nodeID, nil)
+}
+
+func (c *Client) ClearNodeExpiry(ctx context.Context, nodeID string) (bool, error) {
+	disable := true
+	if err := c.postExpire(ctx, nodeID, map[string]any{"disableExpiry": disable}); err != nil {
+		far := time.Now().UTC().AddDate(100, 0, 0)
+		if err := c.postExpire(ctx, nodeID, map[string]any{"expiry": far.Format(time.RFC3339)}); err != nil {
+			return false, err
+		}
+	}
+	expiry, err := c.nodeExpiry(ctx, nodeID)
+	if err != nil {
+		return false, err
+	}
+	return expiry.IsZero() || expiry.After(time.Now().Add(time.Hour)), nil
+}
+
+func (c *Client) postExpire(ctx context.Context, nodeID string, body any) error {
+	res, err := c.do(ctx, http.MethodPost, "/api/v1/node/"+url.PathEscape(nodeID)+"/expire", body)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 300 {
+		b, _ := io.ReadAll(res.Body)
+		return &Error{Message: "Failed to update node expiry", Status: res.StatusCode, Body: string(b)}
+	}
+	return nil
+}
+
+func (c *Client) nodeExpiry(ctx context.Context, nodeID string) (time.Time, error) {
+	res, err := c.do(ctx, http.MethodGet, "/api/v1/node/"+url.PathEscape(nodeID), nil)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode >= 300 {
+		return time.Time{}, &Error{Message: "Failed to read node", Status: res.StatusCode, Body: string(raw)}
+	}
+	var payload struct {
+		Node struct {
+			Expiry string `json:"expiry"`
+		} `json:"node"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return time.Time{}, err
+	}
+	if strings.TrimSpace(payload.Node.Expiry) == "" {
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, payload.Node.Expiry)
+	if err != nil {
+		return time.Time{}, nil
+	}
+	return parsed, nil
+}
+
 func (c *Client) DeleteNode(ctx context.Context, nodeID string) error {
 	res, err := c.do(ctx, http.MethodDelete, "/api/v1/node/"+url.PathEscape(nodeID), nil)
 	if err != nil {

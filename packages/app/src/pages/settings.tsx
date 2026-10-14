@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { controlClassName } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
 import { useCapabilities } from "@/hooks/use-capabilities";
 import { UsersPage } from "@/pages/users";
 
@@ -112,6 +113,23 @@ export function SettingsKeysPage() {
     <div>
       <PageHeader title="Keys" description="Pre-auth keys issued for device join." />
       {error ? <Card><p className="text-graphite">{error}</p></Card> : (
+        <>
+        <RecordCards>
+          {(keys ?? []).map((key) => (
+            <RecordCard
+              key={key.id || key.key}
+              title={key.key ? `${key.key.slice(0, 12)}…` : key.id}
+              rows={[
+                { label: "Reusable", value: key.reusable ? "Yes" : "No" },
+                { label: "Tags", value: key.aclTags?.join(", ") || "—" },
+                { label: "Expires", value: key.expiration ? new Date(key.expiration).toLocaleString() : "—" },
+              ]}
+              actions={<ExpireKeyButton authKey={key.key} />}
+            />
+          ))}
+        </RecordCards>
+        {keys && keys.length === 0 ? <p className="text-sm text-smoke lg:hidden">No auth keys yet.</p> : null}
+        <div className="hidden lg:block">
         <table className="console-table w-full text-left text-sm">
           <thead>
             <tr className="border-b border-ash">
@@ -137,6 +155,8 @@ export function SettingsKeysPage() {
             ) : null}
           </tbody>
         </table>
+        </div>
+        </>
       )}
     </div>
   );

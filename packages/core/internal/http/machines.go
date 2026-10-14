@@ -88,11 +88,11 @@ func (a *API) expireKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) updateMachine(w http.ResponseWriter, r *http.Request) {
-	authz, ok := a.require(w, r, "network.manage")
+	authz, ok := a.require(w, r, "network.view")
 	if !ok {
 		return
 	}
-	if !a.addedMachine(w, r, authz.UserID) {
+	if !a.canChangeMachine(w, r, authz) {
 		return
 	}
 	var body struct {
@@ -140,12 +140,53 @@ func (a *API) updateMachine(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (a *API) deleteMachine(w http.ResponseWriter, r *http.Request) {
-	authz, ok := a.require(w, r, "network.manage")
+func (a *API) setMachineDisabled(w http.ResponseWriter, r *http.Request) {
+	authz, ok := a.require(w, r, "network.view")
 	if !ok {
 		return
 	}
-	if !a.addedMachine(w, r, authz.UserID) {
+	if !a.canChangeMachine(w, r, authz) {
+		return
+	}
+	var body struct {
+		Disabled bool `json:"disabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		fail(w, http.StatusBadRequest, "Invalid body")
+		return
+	}
+	var hsID string
+	if err := a.Store.DB.QueryRow(r.Context(), `SELECT "headscaleNodeId" FROM "Machine" WHERE "id"=?`, r.PathValue("id")).Scan(&hsID); err != nil {
+		fail(w, http.StatusNotFound, "Machine not found")
+		return
+	}
+	reauthenticate := false
+	if client := headscale.FromEnv(); client != nil {
+		if body.Disabled {
+			if err := client.ExpireNode(r.Context(), hsID); err != nil {
+				fail(w, http.StatusBadGateway, headscale.FormatError(err))
+				return
+			}
+		} else if restored, err := client.ClearNodeExpiry(r.Context(), hsID); err != nil || !restored {
+			reauthenticate = true
+		}
+	}
+	if _, err := a.Store.DB.Exec(r.Context(), `UPDATE "Machine" SET "disabled"=?,"updatedAt"=? WHERE "id"=?`, body.Disabled, time.Now().UTC(), r.PathValue("id")); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	org, _ := a.Store.DefaultOrg(r.Context())
+	_ = a.Store.Audit(r.Context(), org.ID, authz.UserID, "machine.disabled", "NETWORK", "machine", r.PathValue("id"), map[string]any{"disabled": body.Disabled})
+	a.Live.Publish("machines")
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reauthenticate": reauthenticate})
+}
+
+func (a *API) deleteMachine(w http.ResponseWriter, r *http.Request) {
+	authz, ok := a.require(w, r, "network.view")
+	if !ok {
+		return
+	}
+	if !a.canChangeMachine(w, r, authz) {
 		return
 	}
 	var hsID string
@@ -166,18 +207,18 @@ func (a *API) deleteMachine(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (a *API) addedMachine(w http.ResponseWriter, r *http.Request, actorID string) bool {
+func (a *API) canChangeMachine(w http.ResponseWriter, r *http.Request, authz store.Capabilities) bool {
 	var creator sql.NullString
 	err := a.Store.DB.QueryRow(r.Context(), `SELECT "createdById" FROM "Machine" WHERE "id"=?`, r.PathValue("id")).Scan(&creator)
 	if err != nil {
 		fail(w, http.StatusNotFound, "Machine not found")
 		return false
 	}
-	if !creator.Valid || creator.String != actorID {
-		fail(w, http.StatusForbidden, "Only the person who added this machine can change it.")
-		return false
+	if steward(authz) || (creator.Valid && creator.String == authz.UserID) {
+		return true
 	}
-	return true
+	fail(w, http.StatusForbidden, "Only an admin or the person who added this machine can change it.")
+	return false
 }
 
 func (a *API) machineSnapshot(ctx context.Context, authz store.Capabilities) (store.MachinesTable, error) {

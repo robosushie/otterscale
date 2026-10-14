@@ -9,6 +9,7 @@ import (
 	"github.com/pquerna/otp/totp"
 	"otterscale/core/internal/auth"
 	"otterscale/core/internal/id"
+	"otterscale/core/internal/store"
 )
 
 func (a *API) redeemInvite(w http.ResponseWriter, r *http.Request) {
@@ -159,4 +160,167 @@ func (a *API) users(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, rows)
+}
+
+func (a *API) updateUser(w http.ResponseWriter, r *http.Request) {
+	authz, ok := a.require(w, r, "members.invite")
+	if !ok {
+		return
+	}
+	userID := r.PathValue("id")
+	if !a.canChangeUser(w, r, authz, userID) {
+		return
+	}
+	var body struct {
+		Role         string   `json:"role"`
+		WorkspaceIDs []string `json:"workspaceIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		fail(w, http.StatusBadRequest, "Invalid body")
+		return
+	}
+	role := strings.ToUpper(strings.TrimSpace(body.Role))
+	if role == "" {
+		role = "MEMBER"
+	}
+	now := time.Now().UTC()
+	switch role {
+	case "SUPER_ADMIN":
+		if !has(authz.Capabilities, "platform.manage_admins") {
+			fail(w, http.StatusForbidden, "Only the owner can assign a Super admin.")
+			return
+		}
+		var existing string
+		if err := a.Store.DB.QueryRow(r.Context(), `SELECT "id" FROM "PlatformMembership" WHERE "userId"=? AND "role"='SUPER_ADMIN'`, userID).Scan(&existing); err != nil {
+			if _, err := a.Store.DB.Exec(r.Context(), `INSERT INTO "PlatformMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?)`, id.New(), userID, "SUPER_ADMIN", now); err != nil {
+				fail(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		a.setTenantRole(r, userID, "ADMIN", now)
+	case "ADMIN", "MEMBER":
+		if a.platformRole(r, userID) == "SUPER_ADMIN" && !has(authz.Capabilities, "platform.manage_admins") {
+			fail(w, http.StatusForbidden, "Only the owner can change a Super admin.")
+			return
+		}
+		if has(authz.Capabilities, "platform.manage_admins") {
+			_, _ = a.Store.DB.Exec(r.Context(), `DELETE FROM "PlatformMembership" WHERE "userId"=? AND "role"='SUPER_ADMIN'`, userID)
+		}
+		a.setTenantRole(r, userID, role, now)
+	default:
+		fail(w, http.StatusBadRequest, "Invalid role.")
+		return
+	}
+	if _, err := a.Store.DB.Exec(r.Context(), `DELETE FROM "WorkspaceMembership" WHERE "userId"=?`, userID); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for _, groupID := range body.WorkspaceIDs {
+		groupID = strings.TrimSpace(groupID)
+		if groupID == "" {
+			continue
+		}
+		if _, err := a.Store.DB.Exec(r.Context(), `INSERT INTO "WorkspaceMembership" ("id","userId","groupId","role","createdAt") VALUES (?,?,?,?,?)`, id.New(), userID, groupID, "MEMBER", now); err != nil {
+			fail(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	a.Live.Publish("users")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) setUserDisabled(w http.ResponseWriter, r *http.Request) {
+	authz, ok := a.require(w, r, "members.invite")
+	if !ok {
+		return
+	}
+	userID := r.PathValue("id")
+	if !a.canChangeUser(w, r, authz, userID) {
+		return
+	}
+	var body struct {
+		Disabled bool `json:"disabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		fail(w, http.StatusBadRequest, "Invalid body")
+		return
+	}
+	if _, err := a.Store.DB.Exec(r.Context(), `UPDATE "User" SET "loginDisabled"=?,"updatedAt"=? WHERE "id"=?`, body.Disabled, time.Now().UTC(), userID); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if body.Disabled {
+		_ = a.Store.DeleteUserSessions(r.Context(), userID)
+	}
+	a.Live.Publish("users")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) deleteUser(w http.ResponseWriter, r *http.Request) {
+	authz, ok := a.require(w, r, "members.invite")
+	if !ok {
+		return
+	}
+	userID := r.PathValue("id")
+	if !a.canChangeUser(w, r, authz, userID) {
+		return
+	}
+	if _, err := a.Store.DB.Exec(r.Context(), `DELETE FROM "User" WHERE "id"=?`, userID); err != nil {
+		fail(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	a.Live.Publish("users")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) updateInvite(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.require(w, r, "members.invite"); !ok {
+		return
+	}
+	var body struct {
+		WorkspaceIDs []string `json:"workspaceIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		fail(w, http.StatusBadRequest, "Invalid body")
+		return
+	}
+	if err := a.Store.ReplaceInviteWorkspaces(r.Context(), r.PathValue("id"), body.WorkspaceIDs); err != nil {
+		fail(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	a.Live.Publish("users")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) canChangeUser(w http.ResponseWriter, r *http.Request, authz store.Capabilities, userID string) bool {
+	if userID == "" || userID == authz.UserID {
+		fail(w, http.StatusBadRequest, "You cannot change your own account here.")
+		return false
+	}
+	role := a.platformRole(r, userID)
+	if role == "OWNER" {
+		fail(w, http.StatusForbidden, "The owner account cannot be changed here.")
+		return false
+	}
+	if role == "SUPER_ADMIN" && !has(authz.Capabilities, "platform.manage_admins") {
+		fail(w, http.StatusForbidden, "Only the owner can change a Super admin.")
+		return false
+	}
+	return true
+}
+
+func (a *API) platformRole(r *http.Request, userID string) string {
+	var role string
+	_ = a.Store.DB.QueryRow(r.Context(), `SELECT "role" FROM "PlatformMembership" WHERE "userId"=? AND "role" IN ('OWNER','SUPER_ADMIN') ORDER BY CASE "role" WHEN 'OWNER' THEN 0 ELSE 1 END LIMIT 1`, userID).Scan(&role)
+	return role
+}
+
+func (a *API) setTenantRole(r *http.Request, userID, role string, now time.Time) {
+	res, err := a.Store.DB.Exec(r.Context(), `UPDATE "TenantMembership" SET "role"=? WHERE "userId"=?`, role, userID)
+	if err != nil {
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		_, _ = a.Store.DB.Exec(r.Context(), `INSERT INTO "TenantMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?)`, id.New(), userID, role, now)
+	}
 }

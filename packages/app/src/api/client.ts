@@ -22,6 +22,7 @@ export type MachineRow = {
   selectedTagIds: string[];
   addedBy: string;
   createdById: string;
+  disabled: boolean;
 };
 
 export type MachinesTable = {
@@ -72,6 +73,8 @@ export const api = {
   updateMachine: (id: string, body: { name: string; workspaceIds: string[]; tagIds: string[] }) =>
     request(`/api/machines/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteMachine: (id: string) => request(`/api/machines/${id}`, { method: "DELETE" }),
+  setMachineDisabled: (id: string, disabled: boolean) =>
+    request<{ ok: boolean; reauthenticate?: boolean }>(`/api/machines/${id}/disabled`, { method: "POST", body: JSON.stringify({ disabled }) }),
   workspaces: () => request<WorkspaceRow[]>("/api/workspaces"),
   createWorkspace: (name: string) => request("/api/workspaces", { method: "POST", body: JSON.stringify({ name }) }),
   addMember: (id: string, email: string, role: string) =>
@@ -87,15 +90,21 @@ export const api = {
   publishApp: (body: { machineId: string; port: number; subdomain: string }) =>
     request("/api/apps", { method: "POST", body: JSON.stringify(body) }),
   deleteApp: (id: string) => request(`/api/apps/${id}`, { method: "DELETE" }),
+  setAppDisabled: (id: string, disabled: boolean) =>
+    request(`/api/apps/${id}/disabled`, { method: "POST", body: JSON.stringify({ disabled }) }),
   users: () =>
-    request<{ id: string; username: string; email: string; name: string; role: string; roleKey?: string; joined?: string; workspaceIds?: string[]; workspaces: string[] }[]>("/api/users"),
+    request<{ id: string; username: string; email: string; name: string; role: string; roleKey?: string; joined?: string; workspaceIds?: string[]; workspaces: string[]; loginDisabled?: boolean }[]>("/api/users"),
   updateUser: (id: string, body: { role: string; workspaceIds: string[] }) =>
     request(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  setUserDisabled: (id: string, disabled: boolean) =>
+    request(`/api/users/${id}/disabled`, { method: "POST", body: JSON.stringify({ disabled }) }),
   deleteUser: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
   createInvite: (body: { email: string; username: string; role: string; workspaceIds: string[] }) =>
     request<{ id?: string; code: string; email: string; acceptPath: string; expiresAt?: string }>("/api/users/invites", { method: "POST", body: JSON.stringify(body) }),
   invites: () =>
     request<{ id: string; email: string; username: string; tenantRole: string; platformRole: string | null; expiresAt: string; workspaceIds?: string[]; workspaces?: string[] }[]>("/api/users/invites"),
+  updateInvite: (id: string, workspaceIds: string[]) =>
+    request(`/api/users/invites/${id}`, { method: "PATCH", body: JSON.stringify({ workspaceIds }) }),
   revokeInvite: (id: string) => request(`/api/users/invites/${id}/revoke`, { method: "POST", body: "{}" }),
   audit: (category: "SYSTEM" | "NETWORK") => request<{ id: string; action: string; actor: string; createdAt: string }[]>(`/api/audit?category=${category}`),
   settings: () => request<{ name: string; appsBaseDomain: string; defaultAuthKeyExpiryHours: number }>("/api/settings"),

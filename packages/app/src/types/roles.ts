@@ -14,6 +14,10 @@ export type Capability =
   | "members.view"
   | "members.invite";
 
+export function isSteward(ctx: Pick<UserCapabilities, "isOwner" | "isPlatformAdmin" | "tenantRole">) {
+  return ctx.isOwner || ctx.isPlatformAdmin || ctx.tenantRole === "ADMIN";
+}
+
 export type UserCapabilities = {
   userId: string;
   email: string;

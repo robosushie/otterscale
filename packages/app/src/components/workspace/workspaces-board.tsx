@@ -4,6 +4,7 @@ import { AddPanel, SidePanel } from "@/components/ui/side-panel";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
 
 type WorkspaceRow = {
   id: string;
@@ -34,6 +35,25 @@ export function WorkspacesBoard({ workspaces, onChanged }: { workspaces: Workspa
       <p className="mb-3 text-[12px] text-smoke">
         {workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"}
       </p>
+      <RecordCards>
+        {workspaces.map((workspace) => (
+          <RecordCard
+            key={workspace.id}
+            title={workspace.name}
+            rows={[
+              { label: "Members", value: workspace.members.length },
+              { label: "People", value: workspace.members.join(", ") || "—" },
+            ]}
+            actions={
+              <Button type="button" variant="ghost" onClick={() => setMemberFor(workspace)}>
+                Add member
+              </Button>
+            }
+          />
+        ))}
+      </RecordCards>
+      {workspaces.length === 0 ? <p className="text-sm text-smoke lg:hidden">No workspaces yet.</p> : null}
+      <div className="hidden lg:block">
       <table className="console-table w-full text-left text-sm">
         <thead>
           <tr className="border-b border-ash">
@@ -73,6 +93,7 @@ export function WorkspacesBoard({ workspaces, onChanged }: { workspaces: Workspa
           ) : null}
         </tbody>
       </table>
+      </div>
 
       <SidePanel
         open={Boolean(memberFor)}

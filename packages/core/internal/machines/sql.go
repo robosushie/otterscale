@@ -25,6 +25,7 @@ type MachineRow struct {
 	SelectedTagIDs       []string `json:"selectedTagIds"`
 	AddedBy              string   `json:"addedBy"`
 	CreatedByID          string   `json:"createdById"`
+	Disabled             bool     `json:"disabled"`
 }
 
 type Table struct {
@@ -201,12 +202,13 @@ func BuildTable(ctx context.Context, database *db.DB, orgID string, viewer Viewe
 		seen                    sql.NullTime
 		added                   sql.NullString
 		createdBy               string
+		disabled                bool
 		ws                      []string
 		tagIDs                  []string
 		tagNames                []string
 		acl                     []string
 	}
-	rows, err := database.Query(ctx, `SELECT m."id", m."headscaleNodeId", m."name", m."hostname", m."ipAddresses", m."lastOnline", m."lastSeenAt", m."createdById", u."name", u."username", u."email" FROM "Machine" m LEFT JOIN "User" u ON u."id"=m."createdById" WHERE m."organizationId"=?`, orgID)
+	rows, err := database.Query(ctx, `SELECT m."id", m."headscaleNodeId", m."name", m."hostname", m."ipAddresses", m."lastOnline", m."lastSeenAt", m."createdById", u."name", u."username", u."email", m."disabled" FROM "Machine" m LEFT JOIN "User" u ON u."id"=m."createdById" WHERE m."organizationId"=?`, orgID)
 	if err != nil {
 		return Table{}, err
 	}
@@ -215,7 +217,7 @@ func BuildTable(ctx context.Context, database *db.DB, orgID string, viewer Viewe
 		var m dbMachine
 		var hsID string
 		var creator, uname, uuser, uemail sql.NullString
-		if err := rows.Scan(&m.id, &hsID, &m.name, &m.hostname, &m.ips, &m.online, &m.seen, &creator, &uname, &uuser, &uemail); err != nil {
+		if err := rows.Scan(&m.id, &hsID, &m.name, &m.hostname, &m.ips, &m.online, &m.seen, &creator, &uname, &uuser, &uemail, &m.disabled); err != nil {
 			rows.Close()
 			return Table{}, err
 		}
@@ -279,7 +281,7 @@ func BuildTable(ctx context.Context, database *db.DB, orgID string, viewer Viewe
 		}
 		table.Rows = append(table.Rows, MachineRow{
 			MachineID: row.id, Name: row.name, Addresses: addrs, LastSeen: seen, Online: node.Online,
-			WorkspaceNames: names, TagNames: row.tagNames, SelectedWorkspaceIDs: row.ws, SelectedTagIDs: row.tagIDs, AddedBy: row.added.String, CreatedByID: row.createdBy,
+			WorkspaceNames: names, TagNames: row.tagNames, SelectedWorkspaceIDs: row.ws, SelectedTagIDs: row.tagIDs, AddedBy: row.added.String, CreatedByID: row.createdBy, Disabled: row.disabled,
 		})
 	}
 	if viewer.IsPlatformAdmin {

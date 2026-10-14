@@ -13,9 +13,10 @@ type User struct {
 	Username     string
 	Name         sql.NullString
 	Email        string
-	PasswordHash sql.NullString
-	TotpSecret   sql.NullString
-	TotpEnabled  bool
+	PasswordHash   sql.NullString
+	TotpSecret     sql.NullString
+	TotpEnabled    bool
+	LoginDisabled  bool
 }
 
 type Row struct {
@@ -26,27 +27,28 @@ type Row struct {
 	Role         string   `json:"role"`
 	RoleKey      string   `json:"roleKey"`
 	Joined       string   `json:"joined"`
-	WorkspaceIDs []string `json:"workspaceIds"`
-	Groups       []string `json:"workspaces"`
+	WorkspaceIDs  []string `json:"workspaceIds"`
+	Groups        []string `json:"workspaces"`
+	LoginDisabled bool     `json:"loginDisabled"`
 }
 
 func Find(ctx context.Context, database *db.DB, ident string) (User, error) {
 	ident = strings.TrimSpace(ident)
 	var user User
-	err := database.QueryRow(ctx, `SELECT "id","username","name","email","passwordHash","totpSecret","totpEnabled" FROM "User" WHERE "username"=? OR lower("email")=?`, ident, strings.ToLower(ident)).
-		Scan(&user.ID, &user.Username, &user.Name, &user.Email, &user.PasswordHash, &user.TotpSecret, &user.TotpEnabled)
+	err := database.QueryRow(ctx, `SELECT "id","username","name","email","passwordHash","totpSecret","totpEnabled","loginDisabled" FROM "User" WHERE "username"=? OR lower("email")=?`, ident, strings.ToLower(ident)).
+		Scan(&user.ID, &user.Username, &user.Name, &user.Email, &user.PasswordHash, &user.TotpSecret, &user.TotpEnabled, &user.LoginDisabled)
 	return user, err
 }
 
 func ByID(ctx context.Context, database *db.DB, userID string) (User, error) {
 	var user User
-	err := database.QueryRow(ctx, `SELECT "id","username","name","email","passwordHash","totpSecret","totpEnabled" FROM "User" WHERE "id"=?`, userID).
-		Scan(&user.ID, &user.Username, &user.Name, &user.Email, &user.PasswordHash, &user.TotpSecret, &user.TotpEnabled)
+	err := database.QueryRow(ctx, `SELECT "id","username","name","email","passwordHash","totpSecret","totpEnabled","loginDisabled" FROM "User" WHERE "id"=?`, userID).
+		Scan(&user.ID, &user.Username, &user.Name, &user.Email, &user.PasswordHash, &user.TotpSecret, &user.TotpEnabled, &user.LoginDisabled)
 	return user, err
 }
 
 func List(ctx context.Context, database *db.DB) ([]Row, error) {
-	rows, err := database.Query(ctx, `SELECT "id","username","email",COALESCE("name",''),"createdAt" FROM "User" ORDER BY "email" ASC`)
+	rows, err := database.Query(ctx, `SELECT "id","username","email",COALESCE("name",''),"createdAt","loginDisabled" FROM "User" ORDER BY "email" ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +57,7 @@ func List(ctx context.Context, database *db.DB) ([]Row, error) {
 	for rows.Next() {
 		var row Row
 		var created sql.NullTime
-		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Name, &created); err != nil {
+		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Name, &created, &row.LoginDisabled); err != nil {
 			return nil, err
 		}
 		if created.Valid {

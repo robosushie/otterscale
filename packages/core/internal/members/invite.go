@@ -208,6 +208,30 @@ func ListPending(ctx context.Context, database *db.DB) ([]PendingInvite, error) 
 	return out, nil
 }
 
+func ReplaceInviteWorkspaces(ctx context.Context, database *db.DB, inviteID string, groupIDs []string) error {
+	organisation, err := org.Default(ctx, database)
+	if err != nil {
+		return err
+	}
+	var found string
+	err = database.QueryRow(ctx, `SELECT "id" FROM "UserInvite" WHERE "id"=? AND "organizationId"=? AND "redeemedAt" IS NULL AND "revokedAt" IS NULL`, inviteID, organisation.ID).Scan(&found)
+	if err != nil {
+		return errors.New("Invite not found")
+	}
+	if _, err := database.Exec(ctx, `DELETE FROM "UserInviteWorkspace" WHERE "inviteId"=?`, inviteID); err != nil {
+		return err
+	}
+	for _, groupID := range groupIDs {
+		if strings.TrimSpace(groupID) == "" {
+			continue
+		}
+		if _, err := database.Exec(ctx, `INSERT INTO "UserInviteWorkspace" ("inviteId","groupId") VALUES (?,?)`, inviteID, groupID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func RevokeInvite(ctx context.Context, database *db.DB, inviteID string) error {
 	organisation, err := org.Default(ctx, database)
 	if err != nil {

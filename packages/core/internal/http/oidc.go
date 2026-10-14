@@ -56,6 +56,10 @@ func (a *API) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if user, err := a.Store.UserByID(r.Context(), userID); err == nil && user.LoginDisabled {
+		http.Redirect(w, r, "/signin?error=disabled", http.StatusFound)
+		return
+	}
 	if has, _ := a.Store.HasOwner(r.Context()); !has {
 		_ = a.Store.BootstrapOwner(r.Context(), userID, info.Email)
 	}

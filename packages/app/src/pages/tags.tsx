@@ -3,6 +3,7 @@ import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
 import { AddPanel } from "@/components/ui/side-panel";
 
 export function TagsPage() {
@@ -36,6 +37,13 @@ export function TagsPage() {
         }
       />
       <p className="mb-3 text-[12px] text-smoke">{tags.length} {tags.length === 1 ? "tag" : "tags"}</p>
+      <RecordCards>
+        {tags.map((tag) => (
+          <RecordCard key={tag.id} title={tag.name} rows={[{ label: "ACL tag", value: tag.aclTag }]} />
+        ))}
+      </RecordCards>
+      {tags.length === 0 ? <p className="text-sm text-smoke lg:hidden">No tags yet.</p> : null}
+      <div className="hidden lg:block">
       <table className="console-table w-full text-left text-sm">
         <thead>
           <tr className="border-b border-ash">
@@ -57,6 +65,7 @@ export function TagsPage() {
           ) : null}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

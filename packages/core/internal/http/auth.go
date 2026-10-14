@@ -136,6 +136,10 @@ func (a *API) signin(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "Invalid username, password, or authenticator code.")
 		return
 	}
+	if user.LoginDisabled {
+		fail(w, http.StatusForbidden, "This account is disabled.")
+		return
+	}
 	if user.TotpEnabled {
 		if strings.TrimSpace(body.TotpCode) == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "", "totpRequired": true})
@@ -187,12 +191,27 @@ func (a *API) require(w http.ResponseWriter, r *http.Request, cap string) (store
 	return authz, true
 }
 
+func steward(authz store.Capabilities) bool {
+	if authz.IsOwner || authz.IsPlatformAdmin {
+		return true
+	}
+	return authz.TenantRole != nil && strings.EqualFold(*authz.TenantRole, "ADMIN")
+}
+
 func (a *API) userID(r *http.Request) (string, error) {
 	c, err := r.Cookie("otterscale_session")
 	if err != nil || c.Value == "" {
 		return "", sql.ErrNoRows
 	}
-	return a.Store.UserIDForSession(r.Context(), c.Value)
+	userID, err := a.Store.UserIDForSession(r.Context(), c.Value)
+	if err != nil {
+		return "", err
+	}
+	user, err := a.Store.UserByID(r.Context(), userID)
+	if err != nil || user.LoginDisabled {
+		return "", sql.ErrNoRows
+	}
+	return userID, nil
 }
 
 func (a *API) setSession(w http.ResponseWriter, r *http.Request, userID string) {

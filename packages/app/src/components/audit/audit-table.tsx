@@ -1,3 +1,5 @@
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
+
 type AuditRow = {
   id: string;
   createdAt: Date | string;
@@ -8,6 +10,25 @@ type AuditRow = {
 
 export function AuditTable({ events, empty }: { events: AuditRow[]; empty: string }) {
   return (
+    <>
+      <RecordCards>
+        {events.map((e) => {
+          const when = e.createdAt instanceof Date ? e.createdAt.toISOString() : e.createdAt;
+          return (
+            <RecordCard
+              key={e.id}
+              title={e.action}
+              rows={[
+                { label: "Time", value: when },
+                { label: "Actor", value: e.actorEmail ?? "—" },
+                { label: "Hash", value: e.eventHash ? `${e.eventHash.slice(0, 12)}…` : "—" },
+              ]}
+            />
+          );
+        })}
+      </RecordCards>
+      {events.length === 0 ? <p className="text-sm text-smoke lg:hidden">{empty}</p> : null}
+      <div className="hidden lg:block">
     <table className="console-table w-full text-left text-sm tabular-nums">
       <thead>
         <tr className="border-b border-ash">
@@ -43,5 +64,7 @@ export function AuditTable({ events, empty }: { events: AuditRow[]; empty: strin
         )}
       </tbody>
     </table>
+      </div>
+    </>
   );
 }

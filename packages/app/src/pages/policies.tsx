@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { PageHeader } from "@/components/ui/page-header";
+import { RecordCard, RecordCards } from "@/components/ui/record-card";
 import { AddRulePanel } from "@/components/workspace/add-rule-panel";
 import { PolicyControls } from "@/components/workspace/policy-controls";
 
@@ -20,7 +21,23 @@ export function PoliciesPage() {
     <div>
       <PageHeader title="Policies" description="Extra rules on top of workspace isolation." action={<AddRulePanel groups={groups} tags={tags} />} />
       <p className="mb-3 text-[12px] text-smoke">{rules.length} {rules.length === 1 ? "rule" : "rules"}</p>
-      <table className="console-table mb-10 w-full text-left text-sm">
+      <div className="mb-10 lg:mb-0">
+      <RecordCards>
+        {rules.map((rule) => (
+          <RecordCard
+            key={rule.id}
+            title={rule.group}
+            rows={[
+              { label: "Tag", value: rule.tag || "—" },
+              { label: "Ports", value: rule.ports },
+            ]}
+          />
+        ))}
+      </RecordCards>
+      {rules.length === 0 ? <p className="text-sm text-smoke lg:hidden">No extra rules.</p> : null}
+      </div>
+      <div className="mb-10 hidden lg:block">
+      <table className="console-table w-full text-left text-sm">
         <thead>
           <tr className="border-b border-ash">
             <th>Workspace</th>
@@ -43,6 +60,7 @@ export function PoliciesPage() {
           ) : null}
         </tbody>
       </table>
+      </div>
       <PolicyControls
         latestSnapshotId={latest?.id ?? null}
         previewAction={async () => ({
