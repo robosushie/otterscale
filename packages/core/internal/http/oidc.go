@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+
+	"golang.org/x/oauth2"
 )
 
 func (a *API) oidcStart(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +24,9 @@ func (a *API) oidcStart(w http.ResponseWriter, r *http.Request) {
 	secure := strings.HasPrefix(strings.ToLower(os.Getenv("AUTH_URL")), "https://")
 	http.SetCookie(w, &http.Cookie{Name: "otterscale_oidc_state", Value: state, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: 600})
 	http.SetCookie(w, &http.Cookie{Name: "otterscale_oidc_verifier", Value: verifier, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: 600})
+	if next := safeNext(r.URL.Query().Get("next")); next != "" {
+		http.SetCookie(w, &http.Cookie{Name: "otterscale_oidc_next", Value: url.QueryEscape(next), Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: 600})
+	}
 	http.Redirect(w, r, cfg.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier)), http.StatusFound)
 }
 
@@ -68,8 +73,24 @@ func (a *API) oidcCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	clear("otterscale_oidc_state")
 	clear("otterscale_oidc_verifier")
+	dest := "/machines"
+	if next, err := r.Cookie("otterscale_oidc_next"); err == nil {
+		decoded, _ := url.QueryUnescape(next.Value)
+		if safe := safeNext(decoded); safe != "" {
+			dest = safe
+		}
+	}
+	clear("otterscale_oidc_next")
 	a.setSession(w, r, userID)
-	http.Redirect(w, r, "/machines", http.StatusFound)
+	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+func safeNext(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.ContainsAny(raw, "\\\r\n") {
+		return ""
+	}
+	return raw
 }
 
 type oidcInfo struct {

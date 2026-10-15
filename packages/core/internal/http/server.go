@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"otterscale/core/internal/live"
@@ -11,9 +12,11 @@ import (
 )
 
 type API struct {
-	Store  *store.Store
-	Secret string
-	Live   *live.Hub
+	Store    *store.Store
+	Secret   string
+	Live     *live.Hub
+	links    *linkBook
+	linkOnce sync.Once
 }
 
 func New(st *store.Store, secret string) *API {
@@ -69,10 +72,19 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/audit/export", a.auditExport)
 	mux.HandleFunc("GET /api/settings", a.settings)
 	mux.HandleFunc("PATCH /api/settings", a.updateSettings)
+	mux.HandleFunc("GET /api/client/bootstrap", a.clientBootstrap)
+	mux.HandleFunc("POST /api/client/link", a.createClientLink)
+	mux.HandleFunc("GET /api/client/link/{code}", a.pollClientLink)
+	mux.HandleFunc("POST /api/client/link/{code}/approve", a.approveClientLink)
+	mux.HandleFunc("POST /api/client/device", a.enrollDevice)
+	mux.HandleFunc("GET /api/client/device", a.checkDevice)
 	return mux
 }
 
 func loginServer() string {
+	if raw := strings.TrimSpace(os.Getenv("HEADSCALE_PUBLIC_URL")); raw != "" {
+		return strings.TrimRight(raw, "/")
+	}
 	raw := strings.TrimSpace(os.Getenv("OTTERSCALE_DOMAIN"))
 	if raw == "" {
 		return "http://127.0.0.1:8080"

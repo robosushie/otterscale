@@ -69,6 +69,8 @@ export const api = {
   keys: () => request<{ id: string; key: string; reusable: boolean; aclTags: string[]; expiration: string }[]>("/api/machines/keys"),
   createKey: (body: { workspaceIds: string[]; tagIds: string[]; expiry: string }) =>
     request<{ key: string; loginServer: string }>("/api/machines/keys", { method: "POST", body: JSON.stringify(body) }),
+  approveLink: (code: string, body: { workspaceIds: string[]; tagIds: string[] }) =>
+    request<{ ok: boolean }>(`/api/client/link/${encodeURIComponent(code)}/approve`, { method: "POST", body: JSON.stringify(body) }),
   expireKey: (key: string) => request("/api/machines/keys/expire", { method: "POST", body: JSON.stringify({ key }) }),
   updateMachine: (id: string, body: { name: string; workspaceIds: string[]; tagIds: string[] }) =>
     request(`/api/machines/${id}`, { method: "PATCH", body: JSON.stringify(body) }),

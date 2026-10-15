@@ -82,7 +82,7 @@ export function AcceptInviteForm({ defaultEmail = "", defaultUsername = "" }: Pr
           totpSecret: String(formData.get("totpSecret") ?? ""),
         }),
       );
-      if (result.ok) window.location.href = "/machines";
+      if (result.ok) window.location.href = "/dashboard";
       if (!result.ok) setError(result.error || "Request failed");
     });
   }

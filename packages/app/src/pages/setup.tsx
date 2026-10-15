@@ -28,7 +28,7 @@ export function SetupPage({ oidc, google }: { oidc: boolean; google: boolean }) 
               }),
             ).then((result) => {
               if (result.ok) {
-                window.location.href = "/machines";
+                window.location.href = "/dashboard";
                 return { ok: true as const, data: undefined };
               }
               return result;

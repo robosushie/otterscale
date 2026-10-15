@@ -18,6 +18,11 @@ describe("deploy Caddyfile", () => {
     expect(file).toContain("header_up True-Client-IP {remote_host}");
   });
 
+  it("serves the client bootstrap API on api.<domain>", () => {
+    expect(file).toContain("{$API_HOST:api.localhost}");
+    expect(file).toMatch(/\{\$API_HOST:api\.localhost\} \{[\s\S]*reverse_proxy core:4000/);
+  });
+
   it("sends published apps to the local tsnet hop", () => {
     expect(file).toContain("*.{$APPS_BASE_DOMAIN:apps.localhost}");
     expect(file).toContain("reverse_proxy 127.0.0.1:8081");

@@ -14,10 +14,13 @@ import (
 )
 
 const fileName = "config.json"
+const deviceTokenFile = "device-token"
 
 // File is the on-disk settings for this computer.
 type File struct {
+	BaseDomain  string `json:"baseDomain"`
 	ConsoleURL  string `json:"consoleUrl"`
+	APIURL      string `json:"apiUrl"`
 	LoginServer string `json:"loginServer"`
 	Hostname    string `json:"hostname"`
 }
@@ -94,6 +97,47 @@ func SaveTo(dir string, file File) error {
 	return os.WriteFile(path, raw, 0o600)
 }
 
+// SaveDeviceToken writes the device credential beside the config. It is not part of File.
+func SaveDeviceToken(token string) error {
+	dir, err := Dir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, deviceTokenFile), []byte(strings.TrimSpace(token)), 0o600)
+}
+
+// LoadDeviceToken reads the device credential. A missing file is empty.
+func LoadDeviceToken() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, deviceTokenFile))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+// ClearDeviceToken removes the device credential.
+func ClearDeviceToken() error {
+	dir, err := Dir()
+	if err != nil {
+		return err
+	}
+	err = os.Remove(filepath.Join(dir, deviceTokenFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
 // Save writes settings to Dir.
 func Save(file File) error {
 	dir, err := Dir()
@@ -109,8 +153,12 @@ func Apply(file *File, key, value string) error {
 	next := *file
 	value = strings.TrimSpace(value)
 	switch key {
+	case "base-domain":
+		next.BaseDomain = value
 	case "console-url":
 		next.ConsoleURL = value
+	case "api-url":
+		next.APIURL = value
 	case "login-server":
 		next.LoginServer = value
 	case "hostname":
@@ -127,7 +175,13 @@ func Apply(file *File, key, value string) error {
 
 // Validate checks URLs and the hostname. Empty values are allowed.
 func (f File) Validate() error {
+	if err := baseDomain(f.BaseDomain); err != nil {
+		return err
+	}
 	if err := httpURL(f.ConsoleURL, "console URL"); err != nil {
+		return err
+	}
+	if err := httpURL(f.APIURL, "API URL"); err != nil {
 		return err
 	}
 	if err := httpURL(f.LoginServer, "Headscale URL"); err != nil {
@@ -137,10 +191,22 @@ func (f File) Validate() error {
 }
 
 func (f File) trimmed() File {
+	f.BaseDomain = strings.TrimSpace(f.BaseDomain)
 	f.ConsoleURL = strings.TrimSpace(f.ConsoleURL)
+	f.APIURL = strings.TrimSpace(f.APIURL)
 	f.LoginServer = strings.TrimSpace(f.LoginServer)
 	f.Hostname = strings.TrimSpace(f.Hostname)
 	return f
+}
+
+func baseDomain(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if strings.Contains(raw, "://") || strings.Contains(raw, "/") || strings.Contains(raw, " ") || strings.Contains(raw, ":") {
+		return errors.New("base domain must be a hostname such as otterscale.example")
+	}
+	return nil
 }
 
 func httpURL(raw, label string) error {

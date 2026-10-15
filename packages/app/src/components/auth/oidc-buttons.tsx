@@ -1,5 +1,7 @@
 import { useState, useTransition } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { safeNext } from "@/lib/safe-next";
 
 export function OidcButtons({
   oidcEnabled,
@@ -12,13 +14,17 @@ export function OidcButtons({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const next = safeNext(params.get("next"));
 
   function startOidc() {
     setError(null);
     startTransition(async () => {
-      window.location.href = inviteCode
-        ? `/api/auth/oidc/start?invite=${encodeURIComponent(inviteCode)}`
-        : "/api/auth/oidc/start";
+      const query = new URLSearchParams();
+      if (inviteCode) query.set("invite", inviteCode);
+      if (next) query.set("next", next);
+      const suffix = query.size ? `?${query.toString()}` : "";
+      window.location.href = `/api/auth/oidc/start${suffix}`;
     });
   }
 

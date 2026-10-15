@@ -95,6 +95,7 @@ services:
       HEADSCALE_INTERNAL_URL: http://headscale:8080
       APPS_EDGE_AUTHKEY: ""
       CONSOLE_HOST: ${CONSOLE_HOST:-console.localhost}
+      API_HOST: ${API_HOST:-api.localhost}
       HS_HOST: ${HS_HOST:-hs.localhost}
       APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-apps.localhost}
       APPS_ROUTES_PATH: /data/apps-caddy/routes.json

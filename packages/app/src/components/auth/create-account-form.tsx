@@ -97,7 +97,7 @@ export function CreateAccountForm({
           totpSecret: String(formData.get("totpSecret") ?? ""),
         }),
       );
-      if (result.ok) window.location.href = "/machines";
+      if (result.ok) window.location.href = "/dashboard";
       if (!result.ok) setError(result.error || "Could not create the account.");
     });
   }

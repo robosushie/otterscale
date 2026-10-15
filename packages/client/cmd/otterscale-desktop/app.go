@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"otterscale/client/internal/config"
+	"otterscale/client/internal/discover"
 	"otterscale/client/internal/engine"
 
 	"github.com/energye/systray"
@@ -39,6 +40,7 @@ func (a *App) startup(ctx context.Context) {
 		ensure, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		_ = a.engine.Ensure(ensure)
+		a.checkDevice()
 		a.refreshTray()
 	}()
 	go a.watchTray()
@@ -94,6 +96,7 @@ func (a *App) watchTray() {
 		case <-a.stopped:
 			return
 		case <-ticker.C:
+			a.checkDevice()
 			a.refreshTray()
 		}
 	}
@@ -179,6 +182,122 @@ func (a *App) Disconnect() error {
 	return err
 }
 
+// ConnectConsole loads addresses from api.<domain>, opens the console to approve
+// this computer, and joins the network with the one-time key. The key is not saved.
+func (a *App) ConnectConsole(baseDomain string) error {
+	domain, err := discover.NormalizeDomain(baseDomain)
+	if err != nil {
+		return err
+	}
+	fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 20*time.Second)
+	apiBase := discover.APIBase(domain)
+	ends, err := discover.FetchBootstrap(fetchCtx, apiBase)
+	if err != nil {
+		fetchCancel()
+		return err
+	}
+	file, err := config.Load()
+	if err != nil {
+		fetchCancel()
+		return err
+	}
+	file.BaseDomain = domain
+	file.ConsoleURL = ends.ConsoleURL
+	file.APIURL = ends.APIURL
+	file.LoginServer = ends.LoginServer
+	if err := config.Save(file); err != nil {
+		fetchCancel()
+		return err
+	}
+	link, err := discover.StartLink(fetchCtx, ends.APIURL)
+	fetchCancel()
+	if a.ctx == nil {
+		return errors.New("window is not ready")
+	}
+	if err != nil {
+		runtime.BrowserOpenURL(a.ctx, ends.ConsoleURL)
+		return err
+	}
+	runtime.BrowserOpenURL(a.ctx, link.ApproveURL)
+	pollCtx, pollCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	approval, err := discover.WaitForKey(pollCtx, ends.APIURL, link.Code)
+	pollCancel()
+	if err != nil {
+		return err
+	}
+	upCtx, upCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	err = a.engine.Up(upCtx, engine.UpOptions{
+		AuthKey:     approval.Key,
+		LoginServer: ends.LoginServer,
+		Hostname:    file.Hostname,
+	})
+	upCancel()
+	if err != nil {
+		a.refreshTray()
+		return err
+	}
+	enrollCtx, enrollCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer enrollCancel()
+	token, err := enrollDevice(enrollCtx, a.engine, ends.APIURL, approval.Enrollment)
+	if err != nil {
+		a.refreshTray()
+		return err
+	}
+	if err := config.SaveDeviceToken(token); err != nil {
+		return err
+	}
+	a.refreshTray()
+	return nil
+}
+
+func enrollDevice(ctx context.Context, eng *engine.Engine, apiURL, enrollment string) (string, error) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var last error
+	for {
+		st, _ := eng.Status(ctx)
+		token, err := discover.Enroll(ctx, apiURL, enrollment, st.Addresses)
+		if err == nil {
+			return token, nil
+		}
+		last = err
+		if !discover.Retryable(err) {
+			return "", err
+		}
+		select {
+		case <-ctx.Done():
+			if last != nil {
+				return "", last
+			}
+			return "", ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func (a *App) checkDevice() {
+	token, err := config.LoadDeviceToken()
+	if err != nil || token == "" {
+		return
+	}
+	file, err := config.Load()
+	if err != nil || file.APIURL == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = discover.CheckDevice(ctx, file.APIURL, token)
+	if err == nil || !errors.Is(err, discover.ErrDeviceGone) {
+		return
+	}
+	logout, logoutCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer logoutCancel()
+	if err := a.engine.Logout(logout); err != nil {
+		return
+	}
+	_ = config.ClearDeviceToken()
+}
+
 // OpenConsole opens the saved console URL in the browser.
 func (a *App) OpenConsole() error {
 	file, err := config.Load()
@@ -186,7 +305,7 @@ func (a *App) OpenConsole() error {
 		return err
 	}
 	if file.ConsoleURL == "" {
-		return errors.New("set a console URL in Settings")
+		return errors.New("connect to the console in General first")
 	}
 	if a.ctx == nil {
 		return errors.New("window is not ready")

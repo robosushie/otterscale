@@ -6,6 +6,7 @@ const views = {
 const $ = (id) => document.getElementById(id);
 
 let lastStatus = { backendState: "", hostname: "", addresses: [], loginServer: "", message: "" };
+let saved = { baseDomain: "", consoleUrl: "", apiUrl: "", loginServer: "", hostname: "" };
 
 function bridge() {
   return window.go && window.go.main && window.go.main.App;
@@ -41,15 +42,30 @@ function openNetwork() {
   showTab("network");
 }
 
-function savedLogin() {
-  return ($("modal-login").dataset.saved || "").trim();
+function showOrDash(value) {
+  return (value || "").trim() || "—";
+}
+
+function consoleLogin() {
+  if (!(saved.consoleUrl || "").trim()) return "";
+  return (saved.loginServer || "").trim();
 }
 
 async function loadConfig() {
   const file = await bridge().GetConfig();
-  $("console-url").value = file.consoleUrl || "";
-  $("settings-host").value = file.hostname || "";
-  $("modal-login").dataset.saved = file.loginServer || "";
+  saved = {
+    baseDomain: file.baseDomain || "",
+    consoleUrl: file.consoleUrl || "",
+    apiUrl: file.apiUrl || "",
+    loginServer: file.loginServer || "",
+    hostname: file.hostname || "",
+  };
+  $("base-domain").value = saved.baseDomain;
+  $("settings-host").value = saved.hostname;
+  $("saved-console").textContent = showOrDash(saved.consoleUrl);
+  $("saved-api").textContent = showOrDash(saved.apiUrl);
+  $("saved-login").textContent = showOrDash(consoleLogin());
+  $("network-login").value = consoleLogin();
   return file;
 }
 
@@ -65,18 +81,19 @@ function paint(status) {
   $("network-state").textContent = label;
   const host = lastStatus.hostname || "—";
   const addresses = lastStatus.addresses && lastStatus.addresses.length ? lastStatus.addresses.join(", ") : "—";
-  const login = lastStatus.loginServer || savedLogin() || "—";
+  const login = lastStatus.loginServer || saved.loginServer || "—";
   $("device-host").textContent = host;
   $("device-addrs").textContent = addresses;
   $("dash-login").textContent = login;
   $("net-host").textContent = host;
   $("net-addrs").textContent = addresses;
-  $("net-login").textContent = login;
   $("dash-message").textContent = lastStatus.message || "";
   $("dash-login-wrap").hidden = !on;
   $("dash-add").hidden = on;
   $("network-empty").hidden = on;
   $("network-live").hidden = !on;
+  $("disconnect").hidden = !on;
+  $("register-label").textContent = on ? "Register to a new network" : "Register to a network";
 }
 
 async function refresh() {
@@ -88,23 +105,12 @@ async function refresh() {
   }
 }
 
-function openRegister() {
-  $("modal-login").value = savedLogin() || (lastStatus.loginServer && lastStatus.loginServer !== "—" ? lastStatus.loginServer : "");
-  $("auth-key").value = "";
-  $("modal-message").textContent = "";
-  $("register-dialog").showModal();
-}
-
 async function rememberHostname(status) {
   const file = await bridge().GetConfig();
   const hostname = (file.hostname || "").trim();
   const live = (status.hostname || "").trim();
   if (hostname || !live || live === "—") return;
-  await bridge().SaveConfig({
-    consoleUrl: file.consoleUrl || "",
-    loginServer: file.loginServer || "",
-    hostname: live,
-  });
+  await bridge().SaveConfig({ ...file, hostname: live });
 }
 
 document.querySelectorAll(".nav").forEach((button) => {
@@ -116,30 +122,27 @@ document.querySelectorAll(".tab").forEach((button) => {
 });
 
 $("dash-add").addEventListener("click", openNetwork);
-$("register-open").addEventListener("click", openRegister);
-$("register-again").addEventListener("click", openRegister);
-
-$("modal-cancel").addEventListener("click", () => {
-  $("register-dialog").close();
-});
 
 $("register-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const button = event.currentTarget.querySelector("button[type=submit]");
+  const login = consoleLogin();
+  if (!login) {
+    $("network-message").textContent = "Connect to the console in General first.";
+    return;
+  }
+  const button = $("register");
   button.disabled = true;
-  $("modal-message").textContent = "Registering…";
+  $("network-message").textContent = "Registering…";
   try {
-    await bridge().Connect($("auth-key").value, $("modal-login").value.trim(), "");
+    await bridge().Connect($("auth-key").value, login, "");
     $("auth-key").value = "";
     await refresh();
     await rememberHostname(lastStatus);
     await loadConfig();
     paint(lastStatus);
-    $("register-dialog").close();
     $("network-message").textContent = "This machine was registered.";
-    openNetwork();
   } catch (err) {
-    $("modal-message").textContent = text(err);
+    $("network-message").textContent = text(err);
   } finally {
     button.disabled = false;
   }
@@ -166,8 +169,8 @@ $("settings-form").addEventListener("submit", async (event) => {
   try {
     const existing = await bridge().GetConfig();
     await bridge().SaveConfig({
-      consoleUrl: $("console-url").value.trim(),
-      loginServer: existing.loginServer || "",
+      ...existing,
+      baseDomain: $("base-domain").value.trim(),
       hostname: $("settings-host").value.trim(),
     });
     await loadConfig();
@@ -178,12 +181,23 @@ $("settings-form").addEventListener("submit", async (event) => {
   }
 });
 
-$("open-console").addEventListener("click", async () => {
+$("connect-console").addEventListener("click", async () => {
+  const button = $("connect-console");
+  const typed = $("base-domain").value.trim();
+  button.disabled = true;
+  $("settings-message").textContent = "Waiting for you to approve this computer in the browser…";
   try {
-    await bridge().OpenConsole();
-    $("settings-message").textContent = "";
+    await bridge().ConnectConsole(typed);
+    await loadConfig();
+    await refresh();
+    $("settings-message").textContent = "This computer is connected.";
+    openNetwork();
   } catch (err) {
+    await loadConfig().catch(() => undefined);
+    if (!$("base-domain").value.trim()) $("base-domain").value = typed;
     $("settings-message").textContent = text(err);
+  } finally {
+    button.disabled = false;
   }
 });
 

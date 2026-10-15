@@ -105,7 +105,9 @@ func Run(args []string, stdout, stderr io.Writer, svc Service) int {
 const usage = `Otterscale client
 
   otterscale config show
+  otterscale config set base-domain <domain>
   otterscale config set console-url <url>
+  otterscale config set api-url <url>
   otterscale config set login-server <url>
   otterscale config set hostname <name>
   otterscale up --auth-key <key> [--login-server <url>] [--hostname <name>]
@@ -125,11 +127,11 @@ func runConfig(args []string, stdout, stderr io.Writer, svc Service) int {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		fmt.Fprintf(stdout, "console-url: %s\nlogin-server: %s\nhostname: %s\n", file.ConsoleURL, file.LoginServer, file.Hostname)
+		fmt.Fprintf(stdout, "base-domain: %s\nconsole-url: %s\napi-url: %s\nlogin-server: %s\nhostname: %s\n", file.BaseDomain, file.ConsoleURL, file.APIURL, file.LoginServer, file.Hostname)
 		return 0
 	case "set":
 		if len(args) != 3 {
-			fmt.Fprintln(stderr, "usage: otterscale config set <console-url|login-server|hostname> <value>")
+			fmt.Fprintln(stderr, "usage: otterscale config set <base-domain|console-url|api-url|login-server|hostname> <value>")
 			return 2
 		}
 		if err := svc.Set(args[1], args[2]); err != nil {

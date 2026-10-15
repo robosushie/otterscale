@@ -76,83 +76,70 @@
           <div id="tab-general" role="tabpanel">
             <form id="settings-form" class="panel">
               <label>
-                Console URL
-                <input id="console-url" name="consoleUrl" type="url" autocomplete="off" />
+                Base domain
+                <input id="base-domain" name="baseDomain" type="text" autocomplete="off" spellcheck="false" placeholder="otterscale.example" />
               </label>
+              <dl class="saved-urls">
+                <div><dt>Console</dt><dd id="saved-console">—</dd></div>
+                <div><dt>API</dt><dd id="saved-api">—</dd></div>
+                <div><dt>Headscale</dt><dd id="saved-login">—</dd></div>
+              </dl>
               <label>
                 Hostname
                 <input id="settings-host" name="hostname" type="text" autocomplete="off" spellcheck="false" />
               </label>
               <p id="settings-message" class="message" role="status"></p>
               <div class="actions">
-                <button type="submit" class="primary">
+                <button type="button" id="connect-console" class="primary">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                  <span>Connect to console</span>
+                </button>
+                <button type="submit" class="secondary">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
                   <span>Save</span>
-                </button>
-                <button type="button" id="open-console" class="secondary">
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
-                  <span>Open console</span>
                 </button>
               </div>
             </form>
           </div>
 
           <div id="tab-network" role="tabpanel" hidden>
-            <div id="network-empty" class="panel empty">
-              <p class="hint">This computer is not on a network.</p>
-              <button type="button" id="register-open" class="primary">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
-                <span>Register to a network</span>
-              </button>
-            </div>
-            <div id="network-live" class="panel" hidden>
-              <p class="status-line">
-                <span id="net-dot" class="dot off"></span>
-                <span id="network-state">Not connected</span>
-              </p>
-              <dl>
-                <div><dt>Hostname</dt><dd id="net-host">—</dd></div>
-                <div><dt>Addresses</dt><dd id="net-addrs">—</dd></div>
-                <div><dt>Headscale URL</dt><dd id="net-login">—</dd></div>
-              </dl>
+            <form id="register-form" class="panel">
+              <p id="network-empty" class="hint">This computer is not on a network.</p>
+              <div id="network-live" hidden>
+                <p class="status-line">
+                  <span id="net-dot" class="dot off"></span>
+                  <span id="network-state">Not connected</span>
+                </p>
+                <dl>
+                  <div><dt>Hostname</dt><dd id="net-host">—</dd></div>
+                  <div><dt>Addresses</dt><dd id="net-addrs">—</dd></div>
+                </dl>
+              </div>
+              <label>
+                Headscale URL
+                <input id="network-login" type="text" readonly />
+              </label>
+              <label>
+                Auth key
+                <input id="auth-key" name="authKey" type="password" autocomplete="off" />
+              </label>
+              <p id="network-message" class="message" role="status"></p>
               <div class="actions">
-                <button type="button" id="register-again" class="primary">
+                <button type="submit" id="register" class="primary">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
-                  <span>Register to a new network</span>
+                  <span id="register-label">Register to a network</span>
                 </button>
-                <button type="button" id="disconnect" class="secondary">
+                <button type="button" id="disconnect" class="secondary" hidden>
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /><path d="M7.2 6.2a7 7 0 1 0 9.6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
                   <span>Disconnect</span>
                 </button>
               </div>
-            </div>
-            <p id="network-message" class="message" role="status"></p>
+            </form>
           </div>
         </section>
       </div>
     </div>
 
-    <dialog id="register-dialog" aria-labelledby="register-title">
-      <form id="register-form">
-        <h2 id="register-title">Register to a network</h2>
-        <label>
-          Headscale URL
-          <input id="modal-login" name="loginServer" type="url" autocomplete="off" required />
-        </label>
-        <label>
-          Auth key
-          <input id="auth-key" name="authKey" type="password" autocomplete="off" required />
-        </label>
-        <p id="modal-message" class="message" role="status"></p>
-        <div class="actions">
-          <button type="submit" class="primary">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
-            <span>Register</span>
-          </button>
-          <button type="button" id="modal-cancel" class="ghost">Cancel</button>
-        </div>
-      </form>
-    </dialog>
     <script src="app.js"></script>
   </body>
 </html>
