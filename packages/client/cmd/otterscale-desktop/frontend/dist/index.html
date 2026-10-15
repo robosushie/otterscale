@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Otterscale</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <p class="brand">Otterscale</p>
+        <nav aria-label="Client">
+          <button type="button" class="nav active" data-view="dashboard">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+            <span>Dashboard</span>
+          </button>
+          <button type="button" class="nav" data-view="settings">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8" />
+              <path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <span>Settings</span>
+          </button>
+        </nav>
+      </aside>
+      <div class="main">
+        <header>
+          <h1 id="heading">Dashboard</h1>
+          <p id="lede" class="lede">This computer on the mesh.</p>
+        </header>
+
+        <section id="view-dashboard">
+          <div class="bento">
+            <article class="card">
+              <h2>Status</h2>
+              <p class="status-line">
+                <span id="dash-dot" class="dot off"></span>
+                <span id="status-label">Not connected</span>
+              </p>
+            </article>
+            <article class="card">
+              <h2>This device</h2>
+              <dl>
+                <div><dt>Hostname</dt><dd id="device-host">—</dd></div>
+                <div><dt>Addresses</dt><dd id="device-addrs">—</dd></div>
+              </dl>
+            </article>
+            <article class="card span">
+              <h2>Network</h2>
+              <div id="dash-login-wrap" hidden>
+                <dl>
+                  <div><dt>Headscale URL</dt><dd id="dash-login">—</dd></div>
+                </dl>
+              </div>
+              <button type="button" id="dash-add" class="primary">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                <span>Add to a network</span>
+              </button>
+            </article>
+          </div>
+          <p id="dash-message" class="message" role="status"></p>
+        </section>
+
+        <section id="view-settings" hidden>
+          <div class="tabs" role="tablist" aria-label="Settings">
+            <button type="button" class="tab active" data-tab="general" role="tab" aria-selected="true">General</button>
+            <button type="button" class="tab" data-tab="network" role="tab" aria-selected="false">Network</button>
+          </div>
+
+          <div id="tab-general" role="tabpanel">
+            <form id="settings-form" class="panel">
+              <label>
+                Console URL
+                <input id="console-url" name="consoleUrl" type="url" autocomplete="off" />
+              </label>
+              <label>
+                Hostname
+                <input id="settings-host" name="hostname" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+              <p id="settings-message" class="message" role="status"></p>
+              <div class="actions">
+                <button type="submit" class="primary">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  <span>Save</span>
+                </button>
+                <button type="button" id="open-console" class="secondary">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                  <span>Open console</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div id="tab-network" role="tabpanel" hidden>
+            <div id="network-empty" class="panel empty">
+              <p class="hint">This computer is not on a network.</p>
+              <button type="button" id="register-open" class="primary">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                <span>Register to a network</span>
+              </button>
+            </div>
+            <div id="network-live" class="panel" hidden>
+              <p class="status-line">
+                <span id="net-dot" class="dot off"></span>
+                <span id="network-state">Not connected</span>
+              </p>
+              <dl>
+                <div><dt>Hostname</dt><dd id="net-host">—</dd></div>
+                <div><dt>Addresses</dt><dd id="net-addrs">—</dd></div>
+                <div><dt>Headscale URL</dt><dd id="net-login">—</dd></div>
+              </dl>
+              <div class="actions">
+                <button type="button" id="register-again" class="primary">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                  <span>Register to a new network</span>
+                </button>
+                <button type="button" id="disconnect" class="secondary">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /><path d="M7.2 6.2a7 7 0 1 0 9.6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                  <span>Disconnect</span>
+                </button>
+              </div>
+            </div>
+            <p id="network-message" class="message" role="status"></p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <dialog id="register-dialog" aria-labelledby="register-title">
+      <form id="register-form">
+        <h2 id="register-title">Register to a network</h2>
+        <label>
+          Headscale URL
+          <input id="modal-login" name="loginServer" type="url" autocomplete="off" required />
+        </label>
+        <label>
+          Auth key
+          <input id="auth-key" name="authKey" type="password" autocomplete="off" required />
+        </label>
+        <p id="modal-message" class="message" role="status"></p>
+        <div class="actions">
+          <button type="submit" class="primary">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            <span>Register</span>
+          </button>
+          <button type="button" id="modal-cancel" class="ghost">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

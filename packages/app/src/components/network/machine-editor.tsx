@@ -168,7 +168,7 @@ export function MachinesTable({
               <td>
                 <div className="cell gap-2">
                   <span
-                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${row.online ? "bg-lake-blue" : "bg-ash"}`}
+                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${row.online ? "bg-online" : "bg-ash"}`}
                     aria-label={row.online ? "Online" : "Offline"}
                   />
                   <span className="font-medium">{row.disabled ? `${row.name} · Disabled` : row.name}</span>

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "otterscale-desktop",
+  "outputfilename": "otterscale-desktop",
+  "frontend:dir": "frontend",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "wailsjsdir": "frontend",
+  "author": {
+    "name": "Otterscale"
+  },
+  "info": {
+    "companyName": "Otterscale",
+    "productName": "Otterscale",
+    "productVersion": "0.1.0"
+  }
+}
