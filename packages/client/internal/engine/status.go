@@ -9,6 +9,10 @@ import (
 	"tailscale.com/ipn/ipnstate"
 )
 
+func dialSocket(socket string) meshClient {
+	return &local.Client{Socket: socket}
+}
+
 func probeSocket(ctx context.Context, socket string) bool {
 	ctx, cancel := context.WithTimeout(ctx, 700*time.Millisecond)
 	defer cancel()
@@ -34,7 +38,9 @@ func fromIPN(raw *ipnstate.Status) Status {
 	}
 	st.Hostname = raw.Self.HostName
 	st.DNSName = raw.Self.DNSName
-	st.Addresses = addrs(raw.Self.TailscaleIPs)
+	if st.Online {
+		st.Addresses = addrs(raw.Self.TailscaleIPs)
+	}
 	return st
 }
 

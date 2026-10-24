@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -96,6 +97,45 @@ func (a *API) checkDevice(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusForbidden, "this computer is disabled")
 		return
 	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// deleteDevice removes this computer the same way the console Delete action does.
+func (a *API) deleteDevice(w http.ResponseWriter, r *http.Request) {
+	token := bearerToken(r)
+	if token == "" {
+		fail(w, http.StatusUnauthorized, "missing device token")
+		return
+	}
+	var machineID, hsID string
+	var creator sql.NullString
+	err := a.Store.DB.QueryRow(r.Context(), `SELECT m."id", m."headscaleNodeId", m."createdById" FROM "DeviceCredential" d JOIN "Machine" m ON m."id"=d."machineId" WHERE d."tokenHash"=?`, secretHash(token)).Scan(&machineID, &hsID, &creator)
+	if err != nil {
+		fail(w, http.StatusUnauthorized, "this computer was removed")
+		return
+	}
+	if client := headscale.FromEnv(); client != nil && hsID != "" {
+		if err := client.DeleteNode(r.Context(), hsID); err != nil {
+			fail(w, http.StatusBadGateway, headscale.FormatError(err))
+			return
+		}
+	}
+	if _, err := a.Store.DB.Exec(r.Context(), `DELETE FROM "DeviceCredential" WHERE "machineId"=?`, machineID); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if _, err := a.Store.DB.Exec(r.Context(), `DELETE FROM "Machine" WHERE "id"=?`, machineID); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if org, err := a.Store.DefaultOrg(r.Context()); err == nil {
+		actor := ""
+		if creator.Valid {
+			actor = creator.String
+		}
+		_ = a.Store.Audit(r.Context(), org.ID, actor, "machine.deleted", "NETWORK", "machine", machineID, nil)
+	}
+	a.Live.Publish("machines")
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

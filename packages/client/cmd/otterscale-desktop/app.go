@@ -70,12 +70,9 @@ func (a *App) onTrayReady() {
 	a.status.Store(status)
 	open := systray.AddMenuItem("Open", "Show Otterscale")
 	open.Click(a.show)
-	disconnect := systray.AddMenuItem("Disconnect", "Stop this machine")
+	disconnect := systray.AddMenuItem("Disconnect", "Remove this machine")
 	disconnect.Click(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		_ = a.engine.Down(ctx)
-		a.refreshTray()
+		_ = a.Disconnect()
 	})
 	systray.AddSeparator()
 	quit := systray.AddMenuItem("Quit", "Quit Otterscale")
@@ -173,13 +170,36 @@ func (a *App) Connect(authKey, loginServer, hostname string) error {
 	return err
 }
 
-// Disconnect stops traffic for this machine.
+// Disconnect removes this computer from the console, then signs the daemon out.
 func (a *App) Disconnect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	err := a.engine.Down(ctx)
+	if err := a.removeFromConsole(ctx); err != nil {
+		a.refreshTray()
+		return err
+	}
+	err := a.engine.Logout(ctx)
 	a.refreshTray()
 	return err
+}
+
+func (a *App) removeFromConsole(ctx context.Context) error {
+	token, err := config.LoadDeviceToken()
+	if err != nil {
+		return err
+	}
+	file, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if token == "" || file.APIURL == "" {
+		return errors.New("this computer is not enrolled")
+	}
+	err = discover.DeleteDevice(ctx, file.APIURL, token)
+	if err != nil && !errors.Is(err, discover.ErrDeviceGone) {
+		return err
+	}
+	return config.ClearDeviceToken()
 }
 
 // ConnectConsole loads addresses from api.<domain>, opens the console to approve
@@ -236,7 +256,7 @@ func (a *App) ConnectConsole(baseDomain string) error {
 		a.refreshTray()
 		return err
 	}
-	enrollCtx, enrollCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	enrollCtx, enrollCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer enrollCancel()
 	token, err := enrollDevice(enrollCtx, a.engine, ends.APIURL, approval.Enrollment)
 	if err != nil {
@@ -255,13 +275,20 @@ func enrollDevice(ctx context.Context, eng *engine.Engine, apiURL, enrollment st
 	defer ticker.Stop()
 	var last error
 	for {
-		st, _ := eng.Status(ctx)
-		token, err := discover.Enroll(ctx, apiURL, enrollment, st.Addresses)
+		attempt, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		st, _ := eng.Status(attempt)
+		token, err := discover.Enroll(attempt, apiURL, enrollment, st.Addresses)
+		cancel()
 		if err == nil {
 			return token, nil
 		}
-		last = err
-		if !discover.Retryable(err) {
+		if discover.Retryable(err) {
+			last = err
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			if last == nil {
+				last = err
+			}
+		} else {
 			return "", err
 		}
 		select {

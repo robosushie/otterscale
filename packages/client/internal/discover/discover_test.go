@@ -26,6 +26,26 @@ func TestFetchBootstrapFillsEmptyAPIURL(t *testing.T) {
 	}
 }
 
+func TestDeleteDeviceRemovesTheComputer(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("DELETE /api/client/device", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	if err := DeleteDevice(context.Background(), srv.URL, "secret"); err != nil {
+		t.Fatal(err)
+	}
+	err := DeleteDevice(context.Background(), srv.URL, "other")
+	if !errors.Is(err, ErrDeviceGone) {
+		t.Fatalf("err %v", err)
+	}
+}
+
 func TestCheckDeviceRejectsRemoval(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/client/device", func(w http.ResponseWriter, r *http.Request) {

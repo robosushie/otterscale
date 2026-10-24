@@ -1,5 +1,5 @@
 import { useCallback, useState, useTransition, type FormEvent } from "react";
-import { Ban, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { api, type MachineRow } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { CheckMenu } from "@/components/ui/check-menu";
@@ -56,24 +56,6 @@ export function MachinesTable({
     });
   }
 
-  function onDisable(row: MachineRow) {
-    const next = !row.disabled;
-    if (!confirm(next ? `Disable ${row.name}? The device drops off the tailnet until it is enabled again.` : `Enable ${row.name}?`)) return;
-    startTransition(async () => {
-      setError(null);
-      try {
-        const result = await api.setMachineDisabled(row.machineId, next);
-        if (!next && result.reauthenticate) {
-          setError(`${row.name} is enabled. The device must run tailscale up again before it reconnects.`);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not update the machine");
-        return;
-      }
-      onMutated?.();
-    });
-  }
-
   function onDelete(row: MachineRow) {
     if (!confirm(`Delete ${row.name}? This removes the node from Headscale.`)) return;
     startTransition(async () => {
@@ -103,16 +85,6 @@ export function MachinesTable({
           }}
         >
           <Pencil className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          icon
-          aria-label={row.disabled ? `Enable ${row.name}` : `Disable ${row.name}`}
-          disabled={pending}
-          onClick={() => onDisable(row)}
-        >
-          <Ban className="size-3.5" />
         </Button>
         <Button
           type="button"

@@ -78,6 +78,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/client/link/{code}/approve", a.approveClientLink)
 	mux.HandleFunc("POST /api/client/device", a.enrollDevice)
 	mux.HandleFunc("GET /api/client/device", a.checkDevice)
+	mux.HandleFunc("DELETE /api/client/device", a.deleteDevice)
 	return mux
 }
 

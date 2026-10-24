@@ -13,7 +13,18 @@ import (
 	"time"
 
 	"otterscale/client/internal/config"
+	"tailscale.com/ipn"
+	"tailscale.com/ipn/ipnstate"
 )
+
+// meshClient is the local daemon socket. The auth key is passed only to Start.
+type meshClient interface {
+	Start(ctx context.Context, opts ipn.Options) error
+	EditPrefs(ctx context.Context, mp *ipn.MaskedPrefs) (*ipn.Prefs, error)
+	Logout(ctx context.Context) error
+	StartLoginInteractive(ctx context.Context) error
+	StatusWithoutPeers(ctx context.Context) (*ipnstate.Status, error)
+}
 
 const privilegeHint = "Creating the tunnel needs an administrator on Windows, or root on Linux and macOS. Quit any other mesh client already running on this machine, then try again."
 
@@ -44,12 +55,14 @@ type Runner interface {
 	Start(name string, args []string) error
 }
 
-// Engine drives tailscaled and the tailscale command for this computer.
+// Engine drives tailscaled for this computer. Join and leave go through its socket.
 type Engine struct {
-	Dir    string
-	runner Runner
-	probe  func(ctx context.Context, socket string) bool
-	read   func(ctx context.Context, socket string) (Status, error)
+	Dir       string
+	runner    Runner
+	probe     func(ctx context.Context, socket string) bool
+	read      func(ctx context.Context, socket string) (Status, error)
+	dial      func(socket string) meshClient
+	installed func() bool
 
 	mu       sync.Mutex
 	socket   string
@@ -63,11 +76,45 @@ func New() *Engine {
 		runner: osRunner{},
 		probe:  probeSocket,
 		read:   readStatus,
+		dial:   dialSocket,
 	}
 }
 
-// Ensure starts the mesh daemon when one is not already running.
-// A failed start is remembered until Up is called again.
+const serviceDown = "The Otterscale service is not running."
+
+// ServiceSocket is the local API of the Otterscale system service.
+func ServiceSocket() string {
+	switch runtime.GOOS {
+	case "windows":
+		return `\\.\pipe\otterscale-daemon`
+	case "darwin":
+		return "/var/run/otterscale/daemon.sock"
+	default:
+		return "/run/otterscale/daemon.sock"
+	}
+}
+
+// DaemonStateDir is where the system service stores its node state.
+func DaemonStateDir() string {
+	switch runtime.GOOS {
+	case "windows":
+		return `C:\ProgramData\Otterscale`
+	case "darwin":
+		return "/Library/Application Support/Otterscale"
+	default:
+		return "/var/lib/otterscale"
+	}
+}
+
+// OfficialSocket is the local API of the official Tailscale client.
+func OfficialSocket() string {
+	if runtime.GOOS == "windows" {
+		return `\\.\pipe\ProtectedPrefix\Administrators\Tailscale\tailscaled`
+	}
+	return "/var/run/tailscale/tailscaled.sock"
+}
+
+// Ensure attaches to the Otterscale system service. It does not start one.
 func (e *Engine) Ensure(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -147,54 +194,108 @@ func (e *Engine) Up(ctx context.Context, opts UpOptions) error {
 		}
 	}
 
-	socket := e.currentSocket()
-	bin, err := e.runner.Find(cliNames())
-	if err != nil {
-		return err
-	}
+	client := e.client(e.currentSocket())
 	if opts.AuthKey != "" {
 		// The console contract logs out before registering with a key. A fresh
 		// daemon has nothing to log out of, so a logout failure does not stop up.
-		_, _, _ = e.runner.Run(ctx, bin, socketArgs(socket, "logout"))
+		_ = client.Logout(ctx)
+		if err := client.Start(ctx, ipn.Options{
+			AuthKey:     opts.AuthKey,
+			UpdatePrefs: joinPrefs(login, host),
+		}); err != nil {
+			return socketErr(err, opts.AuthKey)
+		}
+		// The key is already on the daemon. This starts that login and does not open a browser.
+		if err := client.StartLoginInteractive(ctx); err != nil {
+			return socketErr(err, opts.AuthKey)
+		}
+		return e.waitRunning(ctx, client, opts.AuthKey)
 	}
-	args := socketArgs(socket, "up", "--login-server="+login)
-	if opts.AuthKey != "" {
-		args = append(args, "--auth-key="+opts.AuthKey)
-	}
+	prefs := &ipn.MaskedPrefs{WantRunningSet: true, ControlURLSet: true}
+	prefs.WantRunning = true
+	prefs.ControlURL = login
 	if host != "" {
-		args = append(args, "--hostname="+host)
+		prefs.HostnameSet = true
+		prefs.Hostname = host
 	}
-	_, stderr, err := e.runner.Run(ctx, bin, args)
-	if err != nil {
-		return decorate(redact(firstText(stderr, err.Error()), opts.AuthKey))
+	if _, err := client.EditPrefs(ctx, prefs); err != nil {
+		return decorate(err.Error())
 	}
 	return nil
 }
 
 // Down stops traffic for this machine without deleting the auth key.
 func (e *Engine) Down(ctx context.Context) error {
-	return e.simple(ctx, "down")
+	client, err := e.open(ctx)
+	if err != nil {
+		return err
+	}
+	prefs := &ipn.MaskedPrefs{WantRunningSet: true}
+	prefs.WantRunning = false
+	if _, err := client.EditPrefs(ctx, prefs); err != nil {
+		return decorate(err.Error())
+	}
+	return nil
 }
 
 // Logout signs this machine out of the coordination server.
 func (e *Engine) Logout(ctx context.Context) error {
-	return e.simple(ctx, "logout")
-}
-
-func (e *Engine) simple(ctx context.Context, sub string) error {
-	socket, running := e.attachedSocket(ctx)
-	if !running {
-		return errors.New(e.idleMessage())
-	}
-	bin, err := e.runner.Find(cliNames())
+	client, err := e.open(ctx)
 	if err != nil {
 		return err
 	}
-	_, stderr, err := e.runner.Run(ctx, bin, socketArgs(socket, sub))
-	if err != nil {
-		return decorate(firstText(stderr, err.Error()))
+	if err := client.Logout(ctx); err != nil {
+		return decorate(err.Error())
 	}
 	return nil
+}
+
+func (e *Engine) open(ctx context.Context) (meshClient, error) {
+	socket, running := e.attachedSocket(ctx)
+	if !running {
+		return nil, errors.New(e.idleMessage())
+	}
+	return e.client(socket), nil
+}
+
+func (e *Engine) client(socket string) meshClient {
+	if e.dial != nil {
+		return e.dial(socket)
+	}
+	return dialSocket(socket)
+}
+
+func joinPrefs(login, host string) *ipn.Prefs {
+	prefs := ipn.NewPrefs()
+	prefs.ControlURL = login
+	prefs.WantRunning = true
+	prefs.LoggedOut = false
+	if host != "" {
+		prefs.Hostname = host
+	}
+	return prefs
+}
+
+func socketErr(err error, secret string) error {
+	return decorate(redact(err.Error(), secret))
+}
+
+// waitRunning blocks until the daemon is on the network. StartLoginInteractive
+// only begins the auth-key login; Headscale has no node until the state is Running.
+func (e *Engine) waitRunning(ctx context.Context, client meshClient, secret string) error {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		st, err := client.StatusWithoutPeers(ctx)
+		if err == nil && st != nil && st.BackendState == "Running" {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return socketErr(errors.New("the coordination server did not accept the auth key"), secret)
+		case <-ticker.C:
+		}
+	}
 }
 
 func (e *Engine) ensureLocked(ctx context.Context) error {
@@ -204,80 +305,29 @@ func (e *Engine) ensureLocked(ctx context.Context) error {
 		e.startErr = nil
 		return nil
 	}
-	if e.startErr != nil {
+	if e.tailscaleInstalled() {
+		e.startErr = errors.New("The Tailscale service is not running. Start it, then try again.")
 		return e.startErr
 	}
-	dir, err := e.directory()
-	if err != nil {
-		e.startErr = err
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		e.startErr = err
-		return err
-	}
-	bin, err := e.runner.Find(daemonNames())
-	if err != nil {
-		e.startErr = err
-		return err
-	}
-	own := ownSocket(dir)
-	args := []string{"--state=" + filepath.Join(dir, "daemon.state"), "--socket=" + own}
-	if err := e.runner.Start(bin, args); err != nil {
-		e.startErr = decorate(err.Error())
-		return e.startErr
-	}
-	deadline := time.Now().Add(8 * time.Second)
-	for {
-		if e.probe(ctx, own) {
-			e.socket = own
-			e.resolved = true
-			e.startErr = nil
-			return nil
-		}
-		if time.Now().After(deadline) {
-			break
-		}
-		timer := time.NewTimer(200 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			e.startErr = ctx.Err()
-			return e.startErr
-		case <-timer.C:
-		}
-	}
-	e.startErr = decorate(daemonFailure(dir))
+	e.startErr = errors.New(serviceDown)
 	return e.startErr
 }
 
-func daemonFailure(dir string) string {
-	msg := "the mesh daemon did not become ready"
-	raw, err := os.ReadFile(filepath.Join(dir, "daemon.log"))
-	if err != nil {
-		return msg
+func (e *Engine) tailscaleInstalled() bool {
+	if e.installed != nil {
+		return e.installed()
 	}
-	text := strings.TrimSpace(string(raw))
-	if text == "" {
-		return msg
-	}
-	if len(text) > 800 {
-		text = text[len(text)-800:]
-	}
-	return msg + "\n" + text
+	return OfficialInstalled()
 }
 
 func (e *Engine) findRunning(ctx context.Context) (string, bool) {
-	if e.probe(ctx, "") {
-		return "", true
+	official := OfficialSocket()
+	if e.probe(ctx, official) {
+		return official, true
 	}
-	dir, err := e.directory()
-	if err != nil {
-		return "", false
-	}
-	own := ownSocket(dir)
-	if e.probe(ctx, own) {
-		return own, true
+	socket := ServiceSocket()
+	if e.probe(ctx, socket) {
+		return socket, true
 	}
 	return "", false
 }
@@ -331,46 +381,7 @@ func (e *Engine) idleMessage() string {
 	if e.startErr != nil {
 		return e.startErr.Error()
 	}
-	return "Mesh daemon is not running."
-}
-
-func socketArgs(socket, sub string, extra ...string) []string {
-	args := make([]string, 0, 4+len(extra))
-	if socket != "" {
-		args = append(args, "--socket="+socket)
-	}
-	args = append(args, sub)
-	args = append(args, extra...)
-	return args
-}
-
-func cliNames() []string {
-	if runtime.GOOS == "windows" {
-		return []string{"tailscale.exe", "tailscale"}
-	}
-	return []string{"tailscale"}
-}
-
-func daemonNames() []string {
-	if runtime.GOOS == "windows" {
-		return []string{"tailscaled.exe", "tailscaled"}
-	}
-	return []string{"tailscaled"}
-}
-
-func ownSocket(dir string) string {
-	if runtime.GOOS == "windows" {
-		return `\\.\pipe\otterscale-daemon`
-	}
-	return filepath.Join(dir, "daemon.sock")
-}
-
-func firstText(stderr, fallback string) string {
-	stderr = strings.TrimSpace(stderr)
-	if stderr != "" {
-		return stderr
-	}
-	return strings.TrimSpace(fallback)
+	return serviceDown
 }
 
 func redact(message, secret string) string {

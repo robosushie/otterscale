@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type WorkspaceRow } from "@/api/client";
+import { api, type MachinesTable, type WorkspaceRow } from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCapabilities } from "@/hooks/use-capabilities";
+import { useLive } from "@/hooks/use-live";
 
 type Load<T> = { status: "empty" | "ready"; value: T };
 
@@ -18,15 +19,19 @@ function useSummary() {
   const [workspaces, setWorkspaces] = useState<Load<WorkspaceRow[]>>({ status: "empty", value: [] });
   const [tags, setTags] = useState<Load<{ id: string; name: string }[]>>({ status: "empty", value: [] });
 
+  const applyMachines = useCallback((table: MachinesTable) => {
+    if (!canNetwork) return;
+    setMachines({ status: "ready", value: { total: table.rows.length, online: table.rows.filter((row) => row.online).length } });
+  }, [canNetwork]);
+  useLive("machines", applyMachines);
+
   useEffect(() => {
     if (!canNetwork) return;
-    void api.machines().then((table) => {
-      setMachines({ status: "ready", value: { total: table.rows.length, online: table.rows.filter((row) => row.online).length } });
-    }).catch(() => undefined);
+    void api.machines().then(applyMachines).catch(() => undefined);
     void api.apps().then((rows) => {
       setApps({ status: "ready", value: rows.filter((row) => row.status !== "DISABLED").length });
     }).catch(() => undefined);
-  }, [canNetwork]);
+  }, [canNetwork, applyMachines]);
 
   useEffect(() => {
     if (!canMembers) return;

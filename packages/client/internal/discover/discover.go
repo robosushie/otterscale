@@ -186,6 +186,27 @@ func (e *retryError) Error() string {
 	return e.msg
 }
 
+// DeleteDevice removes this computer from the console and from Headscale.
+// ErrDeviceGone means the console row is already gone.
+func DeleteDevice(ctx context.Context, apiBase, token string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, strings.TrimRight(apiBase, "/")+"/api/client/device", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	status, err := doStatus(req, nil)
+	if err != nil {
+		return err
+	}
+	if status >= 200 && status < 300 {
+		return nil
+	}
+	if status == http.StatusUnauthorized || status == http.StatusNotFound || status == http.StatusGone {
+		return ErrDeviceGone
+	}
+	return fmt.Errorf("could not remove this computer: %s", http.StatusText(status))
+}
+
 // CheckDevice reports whether this computer is still present and enabled.
 // A network failure is returned as an error. ErrDeviceGone means the console rejected it.
 func CheckDevice(ctx context.Context, apiBase, token string) error {
