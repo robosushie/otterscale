@@ -4,6 +4,7 @@
 package discover
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -205,6 +206,131 @@ func DeleteDevice(ctx context.Context, apiBase, token string) error {
 		return ErrDeviceGone
 	}
 	return fmt.Errorf("could not remove this computer: %s", http.StatusText(status))
+}
+
+// NetworkWorkspace is a workspace the person who linked this computer belongs to.
+type NetworkWorkspace struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// NetworkMachine is a device the linking user created or that sits in one of their workspaces.
+type NetworkMachine struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Hostname     string   `json:"hostname"`
+	Addresses    []string `json:"addresses"`
+	Online       bool     `json:"online"`
+	CreatedByID  string   `json:"createdById"`
+	AddedBy      string   `json:"addedBy"`
+	WorkspaceIDs []string `json:"workspaceIds"`
+}
+
+// NetworkApp is a published app the linking user created, or a running app in one of their workspaces.
+type NetworkApp struct {
+	ID           string   `json:"id"`
+	Subdomain    string   `json:"subdomain"`
+	Port         int      `json:"port"`
+	Status       string   `json:"status"`
+	Machine      string   `json:"machine"`
+	MachineID    string   `json:"machineId"`
+	CreatedByID  string   `json:"createdById"`
+	AddedBy      string   `json:"addedBy"`
+	WorkspaceIDs []string `json:"workspaceIds"`
+}
+
+// Network is the desktop view of workspaces, machines, and apps.
+type Network struct {
+	UserID     string             `json:"userId"`
+	MachineID  string             `json:"machineId"`
+	Workspaces []NetworkWorkspace `json:"workspaces"`
+	Machines   []NetworkMachine   `json:"machines"`
+	Apps       []NetworkApp       `json:"apps"`
+}
+
+// MachineKey is a one-time key shown once after adding a machine.
+type MachineKey struct {
+	Key         string `json:"key"`
+	LoginServer string `json:"loginServer"`
+	Enrollment  string `json:"enrollment"`
+	APIURL      string `json:"apiUrl"`
+}
+
+// FetchNetwork loads workspaces, machines, and running apps for the device token.
+func FetchNetwork(ctx context.Context, apiBase, token string) (Network, error) {
+	var out Network
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(apiBase, "/")+"/api/client/network", nil)
+	if err != nil {
+		return out, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	if err := doJSON(req, &out); err != nil {
+		return out, err
+	}
+	if out.Workspaces == nil {
+		out.Workspaces = []NetworkWorkspace{}
+	}
+	if out.Machines == nil {
+		out.Machines = []NetworkMachine{}
+	}
+	if out.Apps == nil {
+		out.Apps = []NetworkApp{}
+	}
+	return out, nil
+}
+
+// CreateMachineKey asks the API for a preauth key in the given workspaces.
+func CreateMachineKey(ctx context.Context, apiBase, token string, workspaceIDs []string) (MachineKey, error) {
+	var key MachineKey
+	err := deviceJSON(ctx, http.MethodPost, apiBase, token, "/api/client/machines/keys", map[string]any{"workspaceIds": workspaceIDs}, &key)
+	return key, err
+}
+
+// UpdateMachine changes the name and workspaces of a machine this user added.
+func UpdateMachine(ctx context.Context, apiBase, token, id, name string, workspaceIDs []string) error {
+	return deviceJSON(ctx, http.MethodPatch, apiBase, token, "/api/client/machines/"+id, map[string]any{"name": name, "workspaceIds": workspaceIDs}, nil)
+}
+
+// DeleteOwnedMachine removes a machine this user added.
+func DeleteOwnedMachine(ctx context.Context, apiBase, token, id string) error {
+	return deviceJSON(ctx, http.MethodDelete, apiBase, token, "/api/client/machines/"+id, nil, nil)
+}
+
+// SaveApp creates an app when id is empty, or updates the app this user published.
+func SaveApp(ctx context.Context, apiBase, token, id, machineID, subdomain string, port int) error {
+	body := map[string]any{"machineId": machineID, "subdomain": subdomain, "port": port}
+	if id == "" {
+		return deviceJSON(ctx, http.MethodPost, apiBase, token, "/api/client/apps", body, nil)
+	}
+	return deviceJSON(ctx, http.MethodPatch, apiBase, token, "/api/client/apps/"+id, body, nil)
+}
+
+// DeleteOwnedApp removes an app this user published.
+func DeleteOwnedApp(ctx context.Context, apiBase, token, id string) error {
+	return deviceJSON(ctx, http.MethodDelete, apiBase, token, "/api/client/apps/"+id, nil, nil)
+}
+
+func deviceJSON(ctx context.Context, method, apiBase, token, path string, body any, dest any) error {
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		reader = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(apiBase, "/")+path, reader)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if dest == nil {
+		dest = &struct{}{}
+	}
+	return doJSON(req, dest)
 }
 
 // CheckDevice reports whether this computer is still present and enabled.

@@ -123,3 +123,24 @@ func TestLinkJoin(t *testing.T) {
 		t.Fatalf("%#v", got)
 	}
 }
+
+func TestFetchNetworkUsesTheDeviceToken(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/client/network", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"workspaces":[{"id":"g1","name":"platform"}],"machines":[{"id":"m1","name":"robosushie","hostname":"robosushie","addresses":["100.64.0.2"],"online":true,"workspaceIds":["g1"]}],"apps":[{"id":"a1","subdomain":"notes","port":8080,"status":"ACTIVE","machine":"robosushie","workspaceIds":["g1"]}]}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	got, err := FetchNetwork(context.Background(), srv.URL, "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Workspaces) != 1 || got.Workspaces[0].Name != "platform" || len(got.Machines) != 1 || len(got.Apps) != 1 {
+		t.Fatalf("%#v", got)
+	}
+}

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
       Name="Otterscale"
       Manufacturer="Otterscale"
@@ -10,6 +11,13 @@
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of Otterscale is already installed." />
     <MediaTemplate EmbedCab="yes" />
+
+    <util:CloseApplication
+        Id="CloseOtterscale"
+        Target="otterscale.exe"
+        CloseMessage="yes"
+        RebootPrompt="no"
+        Timeout="5" />
 
     <Feature Id="Main" Title="Otterscale" Level="1">
       <ComponentGroupRef Id="AppFiles" />
@@ -24,12 +32,19 @@
         <Component Id="TailscaledExe" Guid="*">
           <File Id="TailscaledExe" Source="dist\tailscaled.exe" KeyPath="yes" />
         </Component>
+        <Directory Id="BinFolder" Name="bin">
+          <Component Id="OtterscaleCli" Guid="*">
+            <File Id="OtterscaleCli" Source="dist\bin\otterscale.exe" KeyPath="yes" />
+            <Environment Id="OtterscaleCliPath" Name="PATH" Value="[BinFolder]" Permanent="no" Part="last" Action="set" System="yes" />
+          </Component>
+        </Directory>
       </Directory>
     </StandardDirectory>
 
     <ComponentGroup Id="AppFiles">
       <ComponentRef Id="OtterscaleExe" />
       <ComponentRef Id="TailscaledExe" />
+      <ComponentRef Id="OtterscaleCli" />
     </ComponentGroup>
 
     <StandardDirectory Id="ProgramMenuFolder">
@@ -64,10 +79,27 @@
         Execute="deferred"
         Impersonate="no"
         Return="ignore" />
+    <CustomAction
+        Id="StopWindow"
+        Directory="SystemFolder"
+        ExeCommand="taskkill.exe /F /IM otterscale.exe"
+        Execute="deferred"
+        Impersonate="no"
+        Return="ignore" />
+    <CustomAction
+        Id="LaunchApp"
+        FileRef="OtterscaleExe"
+        ExeCommand=""
+        Execute="immediate"
+        Impersonate="yes"
+        Return="asyncNoWait" />
 
     <InstallExecuteSequence>
+      <Custom Action="override Wix4CloseApplications_X64" Before="StopWindow" Condition="REMOVE=&quot;ALL&quot;" />
+      <Custom Action="StopWindow" Before="UninstallDaemon" Condition="REMOVE=&quot;ALL&quot;" />
       <Custom Action="UninstallDaemon" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
       <Custom Action="InstallDaemon" After="InstallFiles" Condition="NOT REMOVE" />
+      <Custom Action="LaunchApp" After="InstallFinalize" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

@@ -55,6 +55,7 @@ type fakeMesh struct {
 	logouts     int
 	logins      int
 	statusCalls int
+	authURL     string
 	states      []string
 	starts      []ipn.Options
 	edits       []*ipn.MaskedPrefs
@@ -92,13 +93,13 @@ func (f *fakeMesh) StatusWithoutPeers(context.Context) (*ipnstate.Status, error)
 			f.states = f.states[1:]
 		}
 	}
-	return &ipnstate.Status{BackendState: state}, nil
+	return &ipnstate.Status{BackendState: state, AuthURL: f.authURL}, nil
 }
 
-func TestUpWithAuthKeyLogsOutThenJoinsAndDoesNotStoreKey(t *testing.T) {
+func TestUpWithAuthKeyJoinsAndDoesNotStoreKey(t *testing.T) {
 	dir := t.TempDir()
 	runner := &fakeRunner{}
-	mesh := &fakeMesh{logoutErr: errors.New("not logged in"), states: []string{"NeedsLogin", "Running"}}
+	mesh := &fakeMesh{states: []string{"NeedsLogin", "Running"}}
 	e := testEngine(dir, runner, mesh)
 	const secret = "tskey-auth-secret"
 	err := e.Up(context.Background(), UpOptions{
@@ -112,7 +113,7 @@ func TestUpWithAuthKeyLogsOutThenJoinsAndDoesNotStoreKey(t *testing.T) {
 	if len(runner.started) != 0 || len(runner.runs) != 0 {
 		t.Fatalf("socket join must not run a command: started %#v runs %#v", runner.started, runner.runs)
 	}
-	if mesh.logouts != 1 || mesh.logins != 1 || len(mesh.starts) != 1 || mesh.statusCalls < 2 {
+	if mesh.logouts != 0 || mesh.logins != 1 || len(mesh.starts) != 1 || mesh.statusCalls < 2 {
 		t.Fatalf("logout %d login %d starts %d status %d", mesh.logouts, mesh.logins, len(mesh.starts), mesh.statusCalls)
 	}
 	started := mesh.starts[0]
@@ -160,6 +161,20 @@ func TestUpWithoutKeyDoesNotLogout(t *testing.T) {
 	}
 	if len(mesh.edits) != 1 || !mesh.edits[0].WantRunning || mesh.edits[0].ControlURL != "https://hs.example" {
 		t.Fatalf("edits %#v", mesh.edits)
+	}
+}
+
+func TestUpAuthKeyKeepsPollingWhenHeadscaleSendsABrowserURL(t *testing.T) {
+	mesh := &fakeMesh{states: []string{"NeedsLogin"}, authURL: "http://127.0.0.1:8080/register/mkey"}
+	e := testEngine(t.TempDir(), &fakeRunner{}, mesh)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	err := e.Up(ctx, UpOptions{AuthKey: "tskey-auth-secret", LoginServer: "https://hs.example"})
+	if err == nil || !strings.Contains(err.Error(), "did not accept the auth key") {
+		t.Fatalf("error %v", err)
+	}
+	if mesh.logins != 1 || mesh.statusCalls < 2 {
+		t.Fatalf("login %d status %d", mesh.logins, mesh.statusCalls)
 	}
 }
 

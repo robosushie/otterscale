@@ -28,7 +28,7 @@ body {
   color: var(--off-black);
 }
 
-button, input { font: inherit; color: inherit; }
+button, input, select { font: inherit; color: inherit; }
 
 .app {
   display: flex;
@@ -176,7 +176,7 @@ label {
   text-transform: uppercase;
 }
 
-input {
+input, select {
   border: 1px solid var(--ash);
   border-radius: 6px;
   background: var(--parchment);
@@ -184,6 +184,90 @@ input {
   text-transform: none;
   letter-spacing: 0;
   font-size: 14px;
+  color: var(--off-black);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-head h2 { margin-bottom: 0; }
+
+.workspace-pick { margin-top: 0; }
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.grid th, .grid td {
+  text-align: left;
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--ash);
+  vertical-align: middle;
+}
+
+.grid th {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  text-transform: uppercase;
+  color: var(--smoke);
+}
+
+.grid td.actions-cell { text-align: right; white-space: nowrap; }
+
+.grid .dot { display: inline-block; }
+
+.name-with-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button.tiny { padding: 6px 10px; }
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.check {
+  flex-direction: row;
+  align-items: center;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+}
+
+#machine-key-command {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.rows { display: flex; flex-direction: column; gap: 12px; }
+
+.row {
+  border-top: 1px solid var(--ash);
+  padding-top: 12px;
+}
+
+.row h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--off-black);
 }
 
 input[readonly] { color: var(--graphite); }

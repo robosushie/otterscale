@@ -5,6 +5,17 @@ import { CheckMenu } from "@/components/ui/check-menu";
 import { Field, Input } from "@/components/ui/field";
 import { CopyButton } from "@/components/ui/copy-button";
 
+function CommandBlock({ command }: { command: string }) {
+  return (
+    <div className="relative rounded-[8px] border border-ash bg-parchment">
+      <div className="absolute top-2 right-2">
+        <CopyButton text={command} label="Copy command" icon />
+      </div>
+      <pre className="overflow-x-auto p-4 pr-12 text-sm whitespace-pre-wrap">{command}</pre>
+    </div>
+  );
+}
+
 export function AuthKeyForm({
   workspaces,
   tags,
@@ -16,24 +27,35 @@ export function AuthKeyForm({
   loginServer: string;
   defaultExpiry: string;
 }) {
-  const [key, setKey] = useState<string | null>(null);
+  const [issued, setIssued] = useState<{ key: string; loginServer: string; enrollment: string; apiUrl: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const command = key ? `tailscale logout\ntailscale up --login-server=${loginServer} --auth-key=${key}` : null;
+  const server = issued?.loginServer || loginServer;
+  const otterscaleCommand = issued
+    ? `otterscale up --login-server=${server} --auth-key=${issued.key} --api-url=${issued.apiUrl} --enrollment=${issued.enrollment}`
+    : null;
+  const tailscaleCommand = issued
+    ? `tailscale logout\ntailscale up --login-server=${server} --auth-key=${issued.key}`
+    : null;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const fd = new FormData(event.currentTarget);
     startTransition(async () => {
       setError(null);
-      setKey(null);
+      setIssued(null);
       try {
         const result = await api.createKey({
           workspaceIds: fd.getAll("workspaceIds").map(String),
           tagIds: fd.getAll("tagIds").map(String),
           expiry: String(fd.get("expiration") ?? ""),
         });
-        setKey(result.key);
+        setIssued({
+          key: result.key,
+          loginServer: result.loginServer,
+          enrollment: result.enrollment,
+          apiUrl: result.apiUrl,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not create a key");
       }
@@ -87,14 +109,17 @@ export function AuthKeyForm({
         </Button>
       </form>
       {error ? <p className="text-sm text-off-black">{error}</p> : null}
-      {command && key ? (
-        <div className="rounded-[8px] border border-ash bg-parchment p-4">
-          <p className="text-[12px] uppercase tracking-[-0.4px] text-smoke">Register with Tailscale</p>
-          <pre className="mt-2 overflow-x-auto text-sm whitespace-pre-wrap">{command}</pre>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <CopyButton text={command} label="Copy command" />
-            <CopyButton text={key} label="Copy key" />
+      {otterscaleCommand && tailscaleCommand && issued ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-graphite">Registers this computer and lists machines in the Otterscale app.</p>
+            <CommandBlock command={otterscaleCommand} />
           </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-graphite">Registers this machine on the website only.</p>
+            <CommandBlock command={tailscaleCommand} />
+          </div>
+          <CopyButton text={issued.key} label="Copy key" />
         </div>
       ) : null}
     </div>

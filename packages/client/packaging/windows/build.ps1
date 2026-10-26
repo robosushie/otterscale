@@ -12,8 +12,12 @@ Push-Location $client
 try {
     go build -o (Join-Path $dist "tailscaled.exe") tailscale.com/cmd/tailscaled
     if ($LASTEXITCODE -ne 0) { throw "tailscaled build failed" }
-    go build -tags production -ldflags="-H windowsgui" -o (Join-Path $dist "otterscale.exe") ./cmd/otterscale-desktop
+    go build -tags production -ldflags="-H windowsgui" -o (Join-Path $dist "otterscale.exe") ./cmd/desktop
     if ($LASTEXITCODE -ne 0) { throw "otterscale build failed" }
+    $bin = Join-Path $dist "bin"
+    New-Item -ItemType Directory -Force -Path $bin | Out-Null
+    go build -o (Join-Path $bin "otterscale.exe") ./cmd/otterscale
+    if ($LASTEXITCODE -ne 0) { throw "otterscale cli build failed" }
 }
 finally {
     Pop-Location
@@ -41,13 +45,17 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
 
 Push-Location $here
 try {
-    wix build -arch x64 -o (Join-Path $dist "otterscale-installer.msi") (Join-Path $here "Package.wxs")
-    if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
+    wix extension add "WixToolset.Util.wixext/$wixVersion"
+    if ($LASTEXITCODE -ne 0) { throw "could not add the WiX util extension" }
     wix extension add "WixToolset.Bal.wixext/$wixVersion"
     if ($LASTEXITCODE -ne 0) { throw "could not add the WiX bootstrapper extension" }
-    $extDll = Get-ChildItem -Recurse -Filter *.wixext.dll (Join-Path $here ".wix") | Select-Object -First 1
-    if (-not $extDll) { throw "WiX bootstrapper extension was not downloaded" }
-    wix build -arch x64 -ext $extDll.FullName -o (Join-Path $dist "otterscale-installer.exe") (Join-Path $here "Bundle.wxs")
+    $utilDll = Get-ChildItem -Recurse -Filter "WixToolset.Util.wixext.dll" (Join-Path $here ".wix") | Select-Object -First 1
+    $balDll = Get-ChildItem -Recurse -Filter "WixToolset.BootstrapperApplications.wixext.dll" (Join-Path $here ".wix") | Select-Object -First 1
+    if (-not $utilDll) { throw "WiX util extension was not downloaded" }
+    if (-not $balDll) { throw "WiX bootstrapper extension was not downloaded" }
+    wix build -arch x64 -ext $utilDll.FullName -o (Join-Path $dist "otterscale-installer.msi") (Join-Path $here "Package.wxs")
+    if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
+    wix build -arch x64 -ext $balDll.FullName -o (Join-Path $dist "otterscale-installer.exe") (Join-Path $here "Bundle.wxs")
     if ($LASTEXITCODE -ne 0) { throw "wix bundle build failed" }
 }
 finally {

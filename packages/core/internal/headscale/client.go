@@ -202,6 +202,27 @@ func (c *Client) ExpireNode(ctx context.Context, nodeID string) error {
 	return c.postExpire(ctx, nodeID, nil)
 }
 
+// removeNodeSettle is how long to wait after expiry before deleting the node.
+// Headscale 0.23 tells the map poller asynchronously. Deleting in the same
+// turn removes the node before that logout is written, and tailscaled then
+// retries a 404 while still reporting Connected.
+var removeNodeSettle = time.Second
+
+// RemoveNode expires the node so the live Tailscale client logs out, then deletes it.
+func (c *Client) RemoveNode(ctx context.Context, nodeID string) error {
+	if err := c.ExpireNode(ctx, nodeID); err != nil {
+		return err
+	}
+	timer := time.NewTimer(removeNodeSettle)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+	}
+	return c.DeleteNode(ctx, nodeID)
+}
+
 func (c *Client) ClearNodeExpiry(ctx context.Context, nodeID string) (bool, error) {
 	disable := true
 	if err := c.postExpire(ctx, nodeID, map[string]any{"disableExpiry": disable}); err != nil {

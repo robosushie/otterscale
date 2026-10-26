@@ -25,6 +25,7 @@ type App struct {
 	status    atomic.Pointer[systray.MenuItem]
 	stopped   chan struct{}
 	stopOnce  sync.Once
+	linking   atomic.Bool
 }
 
 func NewApp() *App {
@@ -202,6 +203,101 @@ func (a *App) removeFromConsole(ctx context.Context) error {
 	return config.ClearDeviceToken()
 }
 
+// Network lists the linking person's workspaces, machines, and running apps.
+func (a *App) Network() (discover.Network, error) {
+	token, err := config.LoadDeviceToken()
+	if err != nil {
+		return discover.Network{}, err
+	}
+	file, err := config.Load()
+	if err != nil {
+		return discover.Network{}, err
+	}
+	if token == "" || file.APIURL == "" {
+		return discover.Network{}, errors.New("this computer is not enrolled")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	return discover.FetchNetwork(ctx, file.APIURL, token)
+}
+
+func (a *App) deviceAPI() (string, string, error) {
+	token, err := config.LoadDeviceToken()
+	if err != nil {
+		return "", "", err
+	}
+	file, err := config.Load()
+	if err != nil {
+		return "", "", err
+	}
+	if token == "" || file.APIURL == "" {
+		return "", "", errors.New("this computer is not enrolled")
+	}
+	return file.APIURL, token, nil
+}
+
+// CreateMachineKey mints a one-time key for workspaces this user belongs to.
+func (a *App) CreateMachineKey(workspaceIDs []string) (discover.MachineKey, error) {
+	apiURL, token, err := a.deviceAPI()
+	if err != nil {
+		return discover.MachineKey{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return discover.CreateMachineKey(ctx, apiURL, token, workspaceIDs)
+}
+
+// UpdateMachine renames a machine this user added and sets its workspaces.
+func (a *App) UpdateMachine(id, name string, workspaceIDs []string) error {
+	apiURL, token, err := a.deviceAPI()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return discover.UpdateMachine(ctx, apiURL, token, id, name, workspaceIDs)
+}
+
+// DeleteMachine removes a machine this user added. This computer is signed out when it is the deleted row.
+func (a *App) DeleteMachine(id string, thisComputer bool) error {
+	apiURL, token, err := a.deviceAPI()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := discover.DeleteOwnedMachine(ctx, apiURL, token, id); err != nil {
+		return err
+	}
+	if !thisComputer {
+		return nil
+	}
+	_ = config.ClearDeviceToken()
+	return a.engine.Logout(ctx)
+}
+
+// SaveApp creates or updates an app on a machine this user added.
+func (a *App) SaveApp(id, machineID, subdomain string, port int) error {
+	apiURL, token, err := a.deviceAPI()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return discover.SaveApp(ctx, apiURL, token, id, machineID, subdomain, port)
+}
+
+// DeleteApp removes an app this user published.
+func (a *App) DeleteApp(id string) error {
+	apiURL, token, err := a.deviceAPI()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return discover.DeleteOwnedApp(ctx, apiURL, token, id)
+}
+
 // ConnectConsole loads addresses from api.<domain>, opens the console to approve
 // this computer, and joins the network with the one-time key. The key is not saved.
 func (a *App) ConnectConsole(baseDomain string) error {
@@ -245,6 +341,11 @@ func (a *App) ConnectConsole(baseDomain string) error {
 	if err != nil {
 		return err
 	}
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "connect-progress", "Joining the network…")
+	}
+	a.linking.Store(true)
+	defer a.linking.Store(false)
 	upCtx, upCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	err = a.engine.Up(upCtx, engine.UpOptions{
 		AuthKey:     approval.Key,
@@ -303,6 +404,9 @@ func enrollDevice(ctx context.Context, eng *engine.Engine, apiURL, enrollment st
 }
 
 func (a *App) checkDevice() {
+	if a.linking.Load() {
+		return
+	}
 	token, err := config.LoadDeviceToken()
 	if err != nil || token == "" {
 		return
@@ -317,11 +421,8 @@ func (a *App) checkDevice() {
 	if err == nil || !errors.Is(err, discover.ErrDeviceGone) {
 		return
 	}
-	logout, logoutCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer logoutCancel()
-	if err := a.engine.Logout(logout); err != nil {
-		return
-	}
+	// The console no longer has this computer. Drop the token only.
+	// Logout is Disconnect; signing the daemon out here also kills a Tailscale session.
 	_ = config.ClearDeviceToken()
 }
 

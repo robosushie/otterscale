@@ -5,9 +5,13 @@
       Name="Otterscale"
       Manufacturer="Otterscale"
       Version="0.1.0.0"
-      UpgradeCode="3F8C1A20-6D4E-4B7A-91C2-5E0A7B3D8F16">
+      UpgradeCode="3F8C1A20-6D4E-4B7A-91C2-5E0A7B3D8F16"
+      IconSourceFile="..\..\cmd\desktop\assets\favicon.ico">
     <BootstrapperApplication>
-      <bal:WixInternalUIBootstrapperApplication />
+      <bal:WixStandardBootstrapperApplication
+          LicenseUrl="https://github.com/robosushie/otterscale"
+          LogoFile="..\..\..\..\public\favicon.png"
+          Theme="hyperlinkLicense" />
     </BootstrapperApplication>
     <Chain>
       <MsiPackage Id="Otterscale" SourceFile="dist\otterscale-installer.msi" />

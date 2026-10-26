@@ -19,6 +19,7 @@ export type AppRow = {
   addedBy: string;
   createdById: string;
   workspaces: string[];
+  workspaceIds: string[];
 };
 
 export function AppsTable({

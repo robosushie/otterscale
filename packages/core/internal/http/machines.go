@@ -41,7 +41,11 @@ func (a *API) createKey(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "Headscale is not configured")
 		return
 	}
-	org, _ := a.Store.DefaultOrg(r.Context())
+	org, err := a.Store.DefaultOrg(r.Context())
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	tags := a.aclTags(r.Context(), body.WorkspaceIDs, body.TagIDs)
 	exp := parseExpiry(body.Expiry, time.Now())
 	key, err := client.CreatePreAuthKey(r.Context(), "tagged-devices", exp, tags)
@@ -49,9 +53,18 @@ func (a *API) createKey(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadGateway, headscale.FormatError(err))
 		return
 	}
+	enrollment, err := a.mintEnrollment(r.Context(), org.ID, authz.UserID, exp)
+	if err != nil {
+		_ = client.ExpirePreAuthKey(r.Context(), key, "tagged-devices")
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	_ = a.Store.Audit(r.Context(), org.ID, authz.UserID, "authkey.created", "NETWORK", "preauthkey", "", map[string]any{"tags": tags})
 	a.Live.Publish("machines")
-	writeJSON(w, http.StatusOK, map[string]string{"key": key, "loginServer": loginServer()})
+	ends := bootstrapEndpoints()
+	writeJSON(w, http.StatusOK, map[string]string{
+		"key": key, "loginServer": loginServer(), "enrollment": enrollment, "apiUrl": ends.APIURL,
+	})
 }
 
 func (a *API) aclTags(ctx context.Context, workspaceIDs, tagIDs []string) []string {
@@ -200,7 +213,7 @@ func (a *API) deleteMachine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if client := headscale.FromEnv(); client != nil {
-		if err := client.DeleteNode(r.Context(), hsID); err != nil {
+		if err := client.RemoveNode(r.Context(), hsID); err != nil {
 			fail(w, http.StatusBadGateway, headscale.FormatError(err))
 			return
 		}

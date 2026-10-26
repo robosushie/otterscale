@@ -151,7 +151,7 @@ func (e *Engine) Status(ctx context.Context) (Status, error) {
 }
 
 // Up registers this machine when AuthKey is set, or reconnects when it is empty.
-// A new auth key follows the console contract: logout, then up.
+// An auth key follows tailscale up: Start stores the key, then StartLoginInteractive sends it.
 func (e *Engine) Up(ctx context.Context, opts UpOptions) error {
 	e.mu.Lock()
 	e.startErr = nil
@@ -196,16 +196,14 @@ func (e *Engine) Up(ctx context.Context, opts UpOptions) error {
 
 	client := e.client(e.currentSocket())
 	if opts.AuthKey != "" {
-		// The console contract logs out before registering with a key. A fresh
-		// daemon has nothing to log out of, so a logout failure does not stop up.
-		_ = client.Logout(ctx)
 		if err := client.Start(ctx, ipn.Options{
 			AuthKey:     opts.AuthKey,
 			UpdatePrefs: joinPrefs(login, host),
 		}); err != nil {
 			return socketErr(err, opts.AuthKey)
 		}
-		// The key is already on the daemon. This starts that login and does not open a browser.
+		// Start stores the auth key. With no node key it does not log in.
+		// StartLoginInteractive sends that key and does not open a browser.
 		if err := client.StartLoginInteractive(ctx); err != nil {
 			return socketErr(err, opts.AuthKey)
 		}
@@ -280,11 +278,12 @@ func socketErr(err error, secret string) error {
 	return decorate(redact(err.Error(), secret))
 }
 
-// waitRunning blocks until the daemon is on the network. StartLoginInteractive
-// only begins the auth-key login; Headscale has no node until the state is Running.
+// waitRunning blocks until the daemon is on the network. A leftover auth URL
+// can appear while the key login is still in progress, so only Running succeeds.
 func (e *Engine) waitRunning(ctx context.Context, client meshClient, secret string) error {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
+	rejected := errors.New("the coordination server did not accept the auth key")
 	for {
 		st, err := client.StatusWithoutPeers(ctx)
 		if err == nil && st != nil && st.BackendState == "Running" {
@@ -292,7 +291,7 @@ func (e *Engine) waitRunning(ctx context.Context, client meshClient, secret stri
 		}
 		select {
 		case <-ctx.Done():
-			return socketErr(errors.New("the coordination server did not accept the auth key"), secret)
+			return socketErr(rejected, secret)
 		case <-ticker.C:
 		}
 	}

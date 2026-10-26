@@ -18,18 +18,19 @@ MACOS="$APP/Contents/MacOS"
 SCRIPTS="$DIST/scripts"
 
 rm -rf "$DIST/payload" "$SCRIPTS"
-mkdir -p "$MACOS" "$SCRIPTS"
+mkdir -p "$MACOS" "$SCRIPTS" "$DIST/payload/usr/local/bin"
 
 export GOTOOLCHAIN="${GOTOOLCHAIN:-go1.25.3}"
 (
   cd "$CLIENT"
   go build -o "$MACOS/tailscaled" tailscale.com/cmd/tailscaled
-  go build -tags production -o "$MACOS/otterscale" ./cmd/otterscale-desktop
+  go build -tags production -o "$MACOS/otterscale" ./cmd/desktop
+  go build -o "$DIST/payload/usr/local/bin/otterscale" ./cmd/otterscale
 )
 
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/scripts/postinstall" "$SCRIPTS/postinstall"
-chmod 755 "$SCRIPTS/postinstall" "$MACOS/otterscale" "$MACOS/tailscaled"
+chmod 755 "$SCRIPTS/postinstall" "$MACOS/otterscale" "$MACOS/tailscaled" "$DIST/payload/usr/local/bin/otterscale"
 
 pkgbuild \
   --root "$DIST/payload" \

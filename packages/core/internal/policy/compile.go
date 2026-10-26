@@ -41,8 +41,8 @@ func CompilePolicy(input CompileInput) CompiledPolicy {
 	}
 	owners := []string{"tagged-devices"}
 	owners = append(owners, input.TagOwnerEmails...)
-	if len(groups["group:platform-admins"]) > 0 {
-		owners = append(owners, "group:platform-admins")
+	if len(groups["group:admin"]) > 0 {
+		owners = append(owners, "group:admin")
 	}
 	owners = unique(owners)
 	tagOwners := map[string][]string{}

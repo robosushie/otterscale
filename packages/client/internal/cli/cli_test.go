@@ -11,10 +11,13 @@ import (
 )
 
 type fakeService struct {
-	file   config.File
-	status engine.Status
-	err    error
-	up     engine.UpOptions
+	file       config.File
+	status     engine.Status
+	err        error
+	up         engine.UpOptions
+	apiURL     string
+	login      string
+	enrollment string
 }
 
 func (f *fakeService) Show() (config.File, error) { return f.file, f.err }
@@ -24,6 +27,12 @@ func (f *fakeService) Set(key, value string) error {
 func (f *fakeService) Up(_ context.Context, authKey, loginServer, hostname string) error {
 	f.up = engine.UpOptions{AuthKey: authKey, LoginServer: loginServer, Hostname: hostname}
 	return f.err
+}
+func (f *fakeService) Enroll(_ context.Context, apiURL, loginServer, enrollment string) error {
+	f.apiURL = apiURL
+	f.login = loginServer
+	f.enrollment = enrollment
+	return nil
 }
 func (f *fakeService) Status(context.Context) (engine.Status, error) { return f.status, f.err }
 func (f *fakeService) Down(context.Context) error                    { return f.err }
@@ -63,6 +72,36 @@ func TestUpPassesFlagsWithoutPrintingTheKey(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "tskey-auth-secret") {
 		t.Fatalf("stdout leaked the key: %s", out.String())
+	}
+}
+
+func TestUpWithEnrollmentDoesNotStoreTheKey(t *testing.T) {
+	svc := &fakeService{}
+	var out, err bytes.Buffer
+	code := Run([]string{"up", "--auth-key", "tskey-auth-secret", "--login-server", "https://hs.example", "--api-url", "https://api.example", "--enrollment", "enroll-secret"}, &out, &err, svc)
+	if code != 0 {
+		t.Fatalf("code %d %s", code, err.String())
+	}
+	if svc.apiURL != "https://api.example" || svc.login != "https://hs.example" || svc.enrollment != "enroll-secret" {
+		t.Fatalf("enroll api=%q login=%q enrollment=%q", svc.apiURL, svc.login, svc.enrollment)
+	}
+	if strings.Contains(out.String(), "tskey-auth-secret") || strings.Contains(err.String(), "tskey-auth-secret") {
+		t.Fatalf("leaked the key: %s %s", out.String(), err.String())
+	}
+	if svc.file.APIURL != "" || svc.file.LoginServer != "" {
+		t.Fatalf("auth material stored in config %#v", svc.file)
+	}
+}
+
+func TestUpEnrollmentRequiresAPIURL(t *testing.T) {
+	svc := &fakeService{}
+	var out, err bytes.Buffer
+	code := Run([]string{"up", "--auth-key", "tskey-auth-secret", "--enrollment", "enroll-secret"}, &out, &err, svc)
+	if code != 2 {
+		t.Fatalf("code %d %s", code, err.String())
+	}
+	if svc.up.AuthKey != "" || svc.enrollment != "" {
+		t.Fatalf("joined %#v enrollment %q", svc.up, svc.enrollment)
 	}
 }
 

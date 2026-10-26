@@ -121,14 +121,29 @@ func Bootstrap(ctx context.Context, database *db.DB, userID, email string) error
 		_, _ = database.Exec(ctx, `INSERT INTO "Tag" ("id","organizationId","name","slug","aclTag","createdAt") VALUES (?,?,?,?,?,?)`,
 			id.New(), organisation.ID, slug, slug, machines.ACLTagForSlug(slug), now)
 	}
-	var groupID string
-	err = database.QueryRow(ctx, `SELECT "id" FROM "Group" WHERE "organizationId"=? AND "name"='platform-admins'`, organisation.ID).Scan(&groupID)
-	if err == sql.ErrNoRows {
-		groupID = id.New()
-		_, _ = database.Exec(ctx, `INSERT INTO "Group" ("id","organizationId","name","createdAt","updatedAt") VALUES (?,?,?,?,?)`, groupID, organisation.ID, "platform-admins", now, now)
+	email = strings.ToLower(email)
+	for _, name := range []string{"platform", "admin"} {
+		var groupID string
+		err = database.QueryRow(ctx, `SELECT "id" FROM "Group" WHERE "organizationId"=? AND "name"=?`, organisation.ID, name).Scan(&groupID)
+		if err == sql.ErrNoRows {
+			groupID = id.New()
+			if _, err = database.Exec(ctx, `INSERT INTO "Group" ("id","organizationId","name","createdAt","updatedAt") VALUES (?,?,?,?,?)`, groupID, organisation.ID, name, now, now); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+		var members int
+		_ = database.QueryRow(ctx, `SELECT COUNT(*) FROM "GroupMember" WHERE "groupId"=? AND "email"=?`, groupID, email).Scan(&members)
+		if members == 0 {
+			_, _ = database.Exec(ctx, `INSERT INTO "GroupMember" ("id","groupId","userId","email","createdAt") VALUES (?,?,?,?,?)`, id.New(), groupID, userID, email, now)
+		}
+		var memberships int
+		_ = database.QueryRow(ctx, `SELECT COUNT(*) FROM "WorkspaceMembership" WHERE "userId"=? AND "groupId"=?`, userID, groupID).Scan(&memberships)
+		if memberships == 0 {
+			_, _ = database.Exec(ctx, `INSERT INTO "WorkspaceMembership" ("id","userId","groupId","role","createdAt") VALUES (?,?,?,?,?)`, id.New(), userID, groupID, "ADMIN", now)
+		}
 	}
-	_, _ = database.Exec(ctx, `INSERT INTO "GroupMember" ("id","groupId","userId","email","createdAt") VALUES (?,?,?,?,?)`, id.New(), groupID, userID, strings.ToLower(email), now)
-	_, _ = database.Exec(ctx, `INSERT INTO "WorkspaceMembership" ("id","userId","groupId","role","createdAt") VALUES (?,?,?,?,?)`, id.New(), userID, groupID, "ADMIN", now)
 	_, _ = database.Exec(ctx, `UPDATE "OrganizationSettings" SET "setupComplete"=?, "updatedAt"=? WHERE "organizationId"=?`, true, now, organisation.ID)
 	return audit.Append(ctx, database, organisation.ID, userID, "auth.owner_bootstrapped", "SYSTEM", "user", userID, map[string]string{"email": email})
 }

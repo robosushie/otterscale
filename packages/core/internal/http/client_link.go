@@ -19,6 +19,7 @@ type deviceLink struct {
 	key            string
 	enrollment     string
 	enrollmentHash string
+	userID         string
 	approved       bool
 	enrollmentUsed bool
 }
@@ -53,7 +54,7 @@ func (b *linkBook) create(now time.Time) (string, time.Time) {
 	return code, expires
 }
 
-func (b *linkBook) approve(code, key string, now time.Time) error {
+func (b *linkBook) approve(code, key, userID string, now time.Time) error {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return err
@@ -70,6 +71,7 @@ func (b *linkBook) approve(code, key string, now time.Time) error {
 	}
 	item.approved = true
 	item.key = key
+	item.userID = userID
 	item.enrollment = enrollment
 	item.enrollmentHash = secretHash(enrollment)
 	return nil
@@ -108,6 +110,16 @@ func (b *linkBook) enrollmentItem(raw string, now time.Time) (*deviceLink, error
 		return item, nil
 	}
 	return nil, errLinkGone
+}
+
+func (b *linkBook) enrollmentOwner(raw string, now time.Time) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	item, err := b.enrollmentItem(raw, now)
+	if err != nil {
+		return "", err
+	}
+	return item.userID, nil
 }
 
 func (b *linkBook) enrollmentReady(raw string, now time.Time) error {
@@ -197,7 +209,7 @@ func (a *API) approveClientLink(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadGateway, headscale.FormatError(err))
 		return
 	}
-	if err := a.linkBook().approve(r.PathValue("code"), key, time.Now()); err != nil {
+	if err := a.linkBook().approve(r.PathValue("code"), key, authz.UserID, time.Now()); err != nil {
 		fail(w, http.StatusGone, err.Error())
 		return
 	}

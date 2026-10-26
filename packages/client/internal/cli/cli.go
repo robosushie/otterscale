@@ -3,6 +3,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"otterscale/client/internal/config"
+	"otterscale/client/internal/discover"
 	"otterscale/client/internal/engine"
 )
 
@@ -18,6 +20,7 @@ type Service interface {
 	Show() (config.File, error)
 	Set(key, value string) error
 	Up(ctx context.Context, authKey, loginServer, hostname string) error
+	Enroll(ctx context.Context, apiURL, loginServer, enrollment string) error
 	Status(ctx context.Context) (engine.Status, error)
 	Down(ctx context.Context) error
 	Logout(ctx context.Context) error
@@ -55,6 +58,56 @@ func (s Live) Up(ctx context.Context, authKey, loginServer, hostname string) err
 		LoginServer: loginServer,
 		Hostname:    hostname,
 	})
+}
+
+// Enroll exchanges the one-time enrollment for a device token and records the API address.
+// The auth key is not written.
+func (s Live) Enroll(ctx context.Context, apiURL, loginServer, enrollment string) error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var last error
+	for {
+		attempt, cancel := context.WithTimeout(ctx, 10*time.Second)
+		st, _ := s.engine().Status(attempt)
+		token, err := discover.Enroll(attempt, apiURL, enrollment, st.Addresses)
+		cancel()
+		if err == nil {
+			if err := config.SaveDeviceToken(token); err != nil {
+				return err
+			}
+			return s.saveJoin(apiURL, loginServer)
+		}
+		if discover.Retryable(err) || errors.Is(err, context.DeadlineExceeded) {
+			last = err
+		} else {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			if last != nil {
+				return last
+			}
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s Live) saveJoin(apiURL, loginServer string) error {
+	file, err := s.Show()
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(apiURL) != "" {
+		file.APIURL = strings.TrimSpace(apiURL)
+	}
+	if strings.TrimSpace(loginServer) != "" {
+		file.LoginServer = strings.TrimSpace(loginServer)
+	}
+	if s.Engine != nil && s.Engine.Dir != "" {
+		return config.SaveTo(s.Engine.Dir, file)
+	}
+	return config.Save(file)
 }
 
 func (s Live) Status(ctx context.Context) (engine.Status, error) {
@@ -110,7 +163,7 @@ const usage = `Otterscale client
   otterscale config set api-url <url>
   otterscale config set login-server <url>
   otterscale config set hostname <name>
-  otterscale up --auth-key <key> [--login-server <url>] [--hostname <name>]
+  otterscale up --auth-key <key> [--login-server <url>] [--hostname <name>] [--api-url <url> --enrollment <secret>]
   otterscale status
   otterscale down
   otterscale logout`
@@ -151,6 +204,8 @@ func runUp(args []string, stdout, stderr io.Writer, svc Service) int {
 	authKey := fs.String("auth-key", "", "auth key from the console")
 	login := fs.String("login-server", "", "Headscale URL")
 	host := fs.String("hostname", "", "name for this machine")
+	apiURL := fs.String("api-url", "", "Otterscale API URL")
+	enrollment := fs.String("enrollment", "", "one-time enrollment from the console")
 	fs.Usage = func() { fmt.Fprintln(stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -159,11 +214,21 @@ func runUp(args []string, stdout, stderr io.Writer, svc Service) int {
 		fmt.Fprintln(stderr, "up requires --auth-key")
 		return 2
 	}
+	if strings.TrimSpace(*enrollment) != "" && strings.TrimSpace(*apiURL) == "" {
+		fmt.Fprintln(stderr, "up requires --api-url with --enrollment")
+		return 2
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := svc.Up(ctx, *authKey, *login, *host); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
+	}
+	if strings.TrimSpace(*enrollment) != "" {
+		if err := svc.Enroll(ctx, strings.TrimSpace(*apiURL), strings.TrimSpace(*login), strings.TrimSpace(*enrollment)); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
 	}
 	fmt.Fprintln(stdout, "Machine registered.")
 	return 0

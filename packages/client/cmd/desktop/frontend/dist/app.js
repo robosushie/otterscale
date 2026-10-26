@@ -1,5 +1,7 @@
 const views = {
   dashboard: ["Dashboard", "This computer on the mesh."],
+  machines: ["Machines", "Your machines, and the other devices in a workspace."],
+  apps: ["Apps", "Your apps, and the other apps in a workspace."],
   settings: ["Settings", "Local settings for this computer."],
 };
 
@@ -7,6 +9,11 @@ const $ = (id) => document.getElementById(id);
 
 let lastStatus = { backendState: "", hostname: "", addresses: [], loginServer: "", message: "" };
 let saved = { baseDomain: "", consoleUrl: "", apiUrl: "", loginServer: "", hostname: "" };
+let currentView = "dashboard";
+let network = { workspaces: [], machines: [], apps: [] };
+let networkError = "";
+let machineWorkspace = "";
+let appWorkspace = "";
 
 function bridge() {
   return window.go && window.go.main && window.go.main.App;
@@ -19,12 +26,14 @@ function text(err) {
 }
 
 function showView(name) {
+  currentView = name;
   for (const key of Object.keys(views)) {
     $("view-" + key).hidden = key !== name;
     document.querySelector('[data-view="' + key + '"]').classList.toggle("active", key === name);
   }
   $("heading").textContent = views[name][0];
   $("lede").textContent = views[name][1];
+  if (name === "machines" || name === "apps") refreshNetwork();
 }
 
 function showTab(name) {
@@ -96,6 +105,99 @@ function paint(status) {
   $("register-label").textContent = on ? "Register to a new network" : "Register to a network";
 }
 
+function fillSelect(id, workspaces, selected) {
+  const select = $(id);
+  const keep = selected && workspaces.some((workspace) => workspace.id === selected);
+  const value = keep ? selected : (workspaces[0] && workspaces[0].id) || "";
+  select.replaceChildren();
+  for (const workspace of workspaces) {
+    const option = document.createElement("option");
+    option.value = workspace.id;
+    option.textContent = workspace.name;
+    select.append(option);
+  }
+  select.value = value;
+  select.hidden = workspaces.length === 0;
+  return value;
+}
+
+function cell(value) {
+  const td = document.createElement("td");
+  td.textContent = value;
+  return td;
+}
+
+function statusDot(on, onLabel, offLabel) {
+  const span = document.createElement("span");
+  span.className = on ? "dot ok" : "dot";
+  span.setAttribute("role", "img");
+  span.setAttribute("aria-label", on ? onLabel : offLabel);
+  return span;
+}
+
+function paintRows(tableId, emptyId, rows, build, emptyText) {
+  const table = $(tableId);
+  const empty = $(emptyId);
+  table.tBodies[0].replaceChildren(...rows.map(build));
+  table.hidden = rows.length === 0;
+  empty.hidden = rows.length > 0;
+  empty.textContent = emptyText;
+}
+
+function leadingCell(label, on, onLabel, offLabel) {
+  const td = document.createElement("td");
+  const wrap = document.createElement("span");
+  wrap.className = "name-with-dot";
+  wrap.append(statusDot(on, onLabel, offLabel), document.createTextNode(label || "—"));
+  td.append(wrap);
+  return td;
+}
+
+function machineRow(machine) {
+  const tr = document.createElement("tr");
+  tr.append(
+    leadingCell(machine.name, Boolean(machine.online), "Online", "Offline"),
+    cell(machine.hostname || "—"),
+    cell(machine.addresses && machine.addresses.length ? machine.addresses.join(", ") : "—"),
+    cell(machine.addedBy || "—"),
+  );
+  return tr;
+}
+
+function appRow(app) {
+  const tr = document.createElement("tr");
+  tr.append(
+    leadingCell(app.subdomain, app.status === "ACTIVE", "Running", "Stopped"),
+    cell(app.machine || "—"),
+    cell(app.port ? String(app.port) : "—"),
+    cell(app.addedBy || "—"),
+  );
+  return tr;
+}
+
+function paintNetwork() {
+  const workspaces = network.workspaces || [];
+  const enrolled = !networkError;
+  machineWorkspace = fillSelect("machines-workspace", workspaces, machineWorkspace);
+  appWorkspace = fillSelect("apps-workspace", workspaces, appWorkspace);
+  const machines = (network.machines || []).filter((machine) => (machine.workspaceIds || []).includes(machineWorkspace));
+  const apps = (network.apps || []).filter((app) => (app.workspaceIds || []).includes(appWorkspace));
+  paintRows("machines", "machines-empty", enrolled ? machines : [], machineRow, enrolled ? "No machines in this workspace." : networkError);
+  paintRows("apps", "apps-empty", enrolled ? apps : [], appRow, enrolled ? "No apps in this workspace." : networkError);
+}
+
+async function refreshNetwork() {
+  if (!bridge() || (currentView !== "machines" && currentView !== "apps")) return;
+  try {
+    network = await bridge().Network();
+    networkError = "";
+  } catch (err) {
+    network = { workspaces: [], machines: [], apps: [] };
+    networkError = text(err);
+  }
+  paintNetwork();
+}
+
 async function refresh() {
   if (!bridge()) return;
   try {
@@ -103,6 +205,7 @@ async function refresh() {
   } catch (err) {
     $("dash-message").textContent = text(err);
   }
+  await refreshNetwork();
 }
 
 async function rememberHostname(status) {
@@ -122,6 +225,16 @@ document.querySelectorAll(".tab").forEach((button) => {
 });
 
 $("dash-add").addEventListener("click", openNetwork);
+
+$("machines-workspace").addEventListener("change", () => {
+  machineWorkspace = $("machines-workspace").value;
+  paintNetwork();
+});
+
+$("apps-workspace").addEventListener("change", () => {
+  appWorkspace = $("apps-workspace").value;
+  paintNetwork();
+});
 
 $("register-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -205,6 +318,11 @@ function boot() {
   if (!bridge()) {
     setTimeout(boot, 50);
     return;
+  }
+  if (window.runtime && window.runtime.EventsOn) {
+    window.runtime.EventsOn("connect-progress", (message) => {
+      if (typeof message === "string" && message) $("settings-message").textContent = message;
+    });
   }
   loadConfig()
     .catch((err) => {

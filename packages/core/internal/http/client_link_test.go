@@ -14,12 +14,19 @@ func TestDeviceLinkHandsOutTheKeyOnce(t *testing.T) {
 	if status != "pending" || key != "" || enrollment != "" {
 		t.Fatalf("pending status=%s key=%q enrollment=%q", status, key, enrollment)
 	}
-	if err := book.approve(code, "tskey-auth-once", now); err != nil {
+	if err := book.approve(code, "tskey-auth-once", "user-1", now); err != nil {
 		t.Fatal(err)
 	}
 	status, key, enrollment = book.poll(code, now)
 	if status != "approved" || key != "tskey-auth-once" || enrollment == "" {
 		t.Fatalf("approved status=%s key=%q enrollment=%q", status, key, enrollment)
+	}
+	owner, err := book.enrollmentOwner(enrollment, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner != "user-1" {
+		t.Fatalf("owner %q", owner)
 	}
 	if err := book.consumeEnrollment(enrollment, now); err != nil {
 		t.Fatal(err)
@@ -41,7 +48,7 @@ func TestDeviceLinkExpires(t *testing.T) {
 	if status != "expired" {
 		t.Fatalf("status %s", status)
 	}
-	if err := book.approve(code, "tskey", now.Add(linkTTL+time.Second)); err == nil || !strings.Contains(err.Error(), "expired") {
+	if err := book.approve(code, "tskey", "user-1", now.Add(linkTTL+time.Second)); err == nil || !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("approve err %v", err)
 	}
 }

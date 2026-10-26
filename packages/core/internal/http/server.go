@@ -79,6 +79,13 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/client/device", a.enrollDevice)
 	mux.HandleFunc("GET /api/client/device", a.checkDevice)
 	mux.HandleFunc("DELETE /api/client/device", a.deleteDevice)
+	mux.HandleFunc("GET /api/client/network", a.clientNetwork)
+	mux.HandleFunc("POST /api/client/machines/keys", a.createClientKey)
+	mux.HandleFunc("PATCH /api/client/machines/{id}", a.updateClientMachine)
+	mux.HandleFunc("DELETE /api/client/machines/{id}", a.deleteClientMachine)
+	mux.HandleFunc("POST /api/client/apps", a.saveClientApp)
+	mux.HandleFunc("PATCH /api/client/apps/{id}", a.saveClientApp)
+	mux.HandleFunc("DELETE /api/client/apps/{id}", a.deleteClientApp)
 	return mux
 }
 
