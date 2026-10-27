@@ -198,7 +198,7 @@ jobs:
           # main rejects a direct push. Record the tag on a branch and open a pull request.
           branch="chore/record-ghcr-${TAG}"
           subject="chore(site): record GHCR tag ${TAG}"
-          if [ "${#subject}" -gt 72 ]; then
+          if [ "${#subject}" -gt 81 ]; then
             subject="chore(site): record published GHCR tag"
           fi
           git checkout -B "$branch"
