@@ -18,6 +18,17 @@
 	}
 }
 
+{$API_HOST:api.localhost} {
+	tls internal
+	reverse_proxy core:4000 {
+		flush_interval -1
+		transport http {
+			read_timeout 1h
+			write_timeout 1h
+		}
+	}
+}
+
 http://{$HS_HOST:hs.localhost} {
 	handle /generate_204 {
 		respond 204

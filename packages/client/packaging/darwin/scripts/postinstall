@@ -1,0 +1,3 @@
+#!/bin/bash
+set -euo pipefail
+/Applications/Otterscale.app/Contents/MacOS/otterscale --install-service

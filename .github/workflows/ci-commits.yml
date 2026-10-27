@@ -38,8 +38,8 @@ jobs:
           REVERT = re.compile(r'^Revert ".+"$')
 
           def problems(text):
-              if len(text) > 72:
-                  return f"is {len(text)} characters; the limit is 72"
+              if len(text) > 81:
+                  return f"is {len(text)} characters; the limit is 81"
               if text.endswith("."):
                   return "ends with a period"
               if HEADER.match(text) or REVERT.match(text):

@@ -17,6 +17,7 @@
   --color-smoke: #797776;
   --color-ash: #cecac8;
   --color-paper: #ffffff;
+  --color-online: #1f7a4d;
 
   --font-display: var(--font-display-family), ui-serif, Georgia, "Times New Roman", serif;
   --font-ui: var(--font-ui-family), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -56,6 +57,7 @@
   --color-smoke: #797776;
   --color-ash: #cecac8;
   --color-paper: #ffffff;
+  --color-online: #1f7a4d;
   --font-display: var(--font-display-family), ui-serif, Georgia, "Times New Roman", serif;
   --font-sans: var(--font-ui-family), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-mono: var(--font-ui-family), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;

@@ -68,7 +68,9 @@ export const api = {
   machines: () => request<MachinesTable>("/api/machines"),
   keys: () => request<{ id: string; key: string; reusable: boolean; aclTags: string[]; expiration: string }[]>("/api/machines/keys"),
   createKey: (body: { workspaceIds: string[]; tagIds: string[]; expiry: string }) =>
-    request<{ key: string; loginServer: string }>("/api/machines/keys", { method: "POST", body: JSON.stringify(body) }),
+    request<{ key: string; loginServer: string; enrollment: string; apiUrl: string }>("/api/machines/keys", { method: "POST", body: JSON.stringify(body) }),
+  approveLink: (code: string, body: { workspaceIds: string[]; tagIds: string[] }) =>
+    request<{ ok: boolean }>(`/api/client/link/${encodeURIComponent(code)}/approve`, { method: "POST", body: JSON.stringify(body) }),
   expireKey: (key: string) => request("/api/machines/keys/expire", { method: "POST", body: JSON.stringify({ key }) }),
   updateMachine: (id: string, body: { name: string; workspaceIds: string[]; tagIds: string[] }) =>
     request(`/api/machines/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -86,7 +88,7 @@ export const api = {
     request("/api/access-rules", { method: "POST", body: JSON.stringify(body) }),
   policies: () => request<{ id: string; status: string; contentHash: string; hujson: string; createdAt: string }[]>("/api/policies"),
   applyPolicy: () => request<{ hujson: string }>("/api/policies/apply", { method: "POST", body: "{}" }),
-  apps: () => request<{ id: string; machine: string; machineId: string; port: number; subdomain: string; status: string; lastError: string; addedBy: string; createdById: string; workspaces: string[] }[]>("/api/apps"),
+  apps: () => request<{ id: string; machine: string; machineId: string; port: number; subdomain: string; status: string; lastError: string; addedBy: string; createdById: string; workspaces: string[]; workspaceIds: string[] }[]>("/api/apps"),
   publishApp: (body: { machineId: string; port: number; subdomain: string }) =>
     request("/api/apps", { method: "POST", body: JSON.stringify(body) }),
   deleteApp: (id: string) => request(`/api/apps/${id}`, { method: "DELETE" }),

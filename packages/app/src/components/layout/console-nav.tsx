@@ -132,6 +132,14 @@ export function ConsoleNav({ capabilities, onNavigate }: { capabilities: Capabil
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Primary">
+      <Link
+        to="/dashboard"
+        onClick={onNavigate}
+        className={linkClass(pathname === "/dashboard", false)}
+        aria-current={pathname === "/dashboard" ? "page" : undefined}
+      >
+        Dashboard
+      </Link>
       {NAV.map((item) => {
         if (item.type === "link") {
           if (!capabilities.includes(item.capability)) return null;
@@ -167,7 +175,7 @@ export function ConsoleNav({ capabilities, onNavigate }: { capabilities: Capabil
 
 export function ConsoleWordmark({ children }: { children?: ReactNode }) {
   return (
-    <Link to="/machines" className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+    <Link to="/dashboard" className="flex min-w-0 items-center gap-2 px-2 py-1.5">
       <BrandLockup />
       {children ? <span className="truncate text-[13px] text-graphite">{children}</span> : null}
     </Link>

@@ -42,6 +42,7 @@ services:
       LISTEN_ADDR: 127.0.0.1:8081
       PROBE_ADDR: :4180
       CONSOLE_HOST: ${CONSOLE_HOST:-console.localhost}
+      API_HOST: ${API_HOST:-api.localhost}
       HS_HOST: ${HS_HOST:-hs.localhost}
       OTTERSCALE_SECRETS_DIR: /data/secrets
     volumes:

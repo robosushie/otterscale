@@ -1,0 +1,18 @@
+#!/bin/sh
+# Reject the commit when the subject (first line) is longer than 81 characters.
+set -eu
+
+if [ $# -lt 1 ] || [ ! -f "$1" ]; then
+  echo "commit-msg: message file missing" >&2
+  exit 1
+fi
+
+subject=$(sed -n '1s/[[:space:]]*$//p' "$1" | tr -d '\r')
+subject=$(printf '%s' "$subject" | sed 's/^[[:space:]]*//')
+
+len=$(printf '%s' "$subject" | wc -m | tr -d '[:space:]')
+
+if [ "$len" -gt 81 ]; then
+  printf 'Commit subject is %s characters; the limit is 81: %s\n' "$len" "$subject" >&2
+  exit 1
+fi

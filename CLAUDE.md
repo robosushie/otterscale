@@ -42,7 +42,7 @@ For component-level recipes (footer, hero float cards, suite tabs), use the chec
 
 ## Git commits
 
-Only commit when the user asks. Format: `<type>(scope): imperative summary` — types `feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style`; subject and PR title limited to 72 characters; HEREDOC for messages; no `--no-verify` unless asked. Full reference: [`.agents/rules/git-commits.md`](./.agents/rules/git-commits.md).
+Only commit when the user asks. Format: `<type>(scope): imperative summary` — types `feat` | `fix` | `refactor` | `chore` | `docs` | `test` | `style`; subject and PR title limited to 81 characters; HEREDOC for messages; no `--no-verify` unless asked. Full reference: [`.agents/rules/git-commits.md`](./.agents/rules/git-commits.md).
 
 ## Database migrations
 

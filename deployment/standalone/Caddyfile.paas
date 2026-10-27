@@ -23,6 +23,17 @@
 		}
 	}
 
+	@api host {$API_HOST:api.localhost}
+	handle @api {
+		reverse_proxy 127.0.0.1:4000 {
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+				write_timeout 1h
+			}
+		}
+	}
+
 	@hs204 {
 		host {$HS_HOST:hs.localhost}
 		path /generate_204

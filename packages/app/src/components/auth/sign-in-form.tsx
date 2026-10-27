@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { OidcButtons } from "@/components/auth/oidc-buttons";
 import { CreateAccountForm } from "@/components/auth/create-account-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/api/client";
 import { asResult } from "@/api/result";
+import { safeNext } from "@/lib/safe-next";
 
 type Step = "email" | "password" | "totp";
 
@@ -25,6 +26,8 @@ export function SignInForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = safeNext(params.get("next"));
   const [account, setAccount] = useState({ email: "", username: "", password: "" });
 
   function submit(totpCode?: string) {
@@ -42,7 +45,7 @@ export function SignInForm({
         }),
       );
       if (result.ok) {
-        navigate("/machines");
+        navigate(next || "/dashboard");
         window.location.reload();
         return;
       }

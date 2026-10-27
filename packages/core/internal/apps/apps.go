@@ -18,16 +18,17 @@ import (
 )
 
 type Row struct {
-	ID        string `json:"id"`
-	MachineID string `json:"machineId"`
-	Machine   string `json:"machine"`
-	Port      int    `json:"port"`
-	Subdomain string `json:"subdomain"`
-	Status    string `json:"status"`
-	LastError   string   `json:"lastError"`
-	AddedBy     string   `json:"addedBy"`
-	CreatedByID string   `json:"createdById"`
-	Workspaces  []string `json:"workspaces"`
+	ID           string   `json:"id"`
+	MachineID    string   `json:"machineId"`
+	Machine      string   `json:"machine"`
+	Port         int      `json:"port"`
+	Subdomain    string   `json:"subdomain"`
+	Status       string   `json:"status"`
+	LastError    string   `json:"lastError"`
+	AddedBy      string   `json:"addedBy"`
+	CreatedByID  string   `json:"createdById"`
+	Workspaces   []string `json:"workspaces"`
+	WorkspaceIDs []string `json:"workspaceIds"`
 }
 
 func List(ctx context.Context, database *db.DB, platformAdmin bool, workspaceIDs []string) ([]Row, error) {
@@ -56,6 +57,7 @@ func List(ctx context.Context, database *db.DB, platformAdmin bool, workspaceIDs
 			continue
 		}
 		row.Workspaces = names
+		row.WorkspaceIDs = wsIDs
 		row.AddedBy = addedBy(name, username, email)
 		out = append(out, row)
 	}

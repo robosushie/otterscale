@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"otterscale/core/internal/live"
@@ -11,13 +12,16 @@ import (
 )
 
 type API struct {
-	Store  *store.Store
-	Secret string
-	Live   *live.Hub
+	Store    *store.Store
+	Secret   string
+	Live     *live.Hub
+	links    *linkBook
+	linkOnce sync.Once
+	limits   *slidingLimiter
 }
 
 func New(st *store.Store, secret string) *API {
-	api := &API{Store: st, Secret: secret, Live: live.NewHub()}
+	api := &API{Store: st, Secret: secret, Live: live.NewHub(), limits: newSlidingLimiter()}
 	api.Live.Sync = api.watchHeadscale
 	return api
 }
@@ -28,12 +32,12 @@ func (a *API) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 	})
 	mux.HandleFunc("GET /api/auth/session", a.session)
-	mux.HandleFunc("POST /api/auth/setup", a.setup)
-	mux.HandleFunc("POST /api/auth/totp", a.totpURI)
-	mux.HandleFunc("POST /api/auth/signin", a.signin)
+	mux.HandleFunc("POST /api/auth/setup", a.limitClient("setup", 5, time.Hour, a.setup))
+	mux.HandleFunc("POST /api/auth/totp", a.limitClient("totp", 10, 15*time.Minute, a.totpURI))
+	mux.HandleFunc("POST /api/auth/signin", a.limitSignin(a.signin))
 	mux.HandleFunc("POST /api/auth/signout", a.signout)
-	mux.HandleFunc("POST /api/auth/invite/lookup", a.lookupInvite)
-	mux.HandleFunc("POST /api/auth/redeem", a.redeemInvite)
+	mux.HandleFunc("POST /api/auth/invite/lookup", a.limitClient("invite-lookup", 10, 15*time.Minute, a.lookupInvite))
+	mux.HandleFunc("POST /api/auth/redeem", a.limitClient("redeem", 10, 15*time.Minute, a.redeemInvite))
 	mux.HandleFunc("GET /api/auth/oidc/start", a.oidcStart)
 	mux.HandleFunc("GET /api/auth/oidc/callback", a.oidcCallback)
 	mux.HandleFunc("GET /api/me/capabilities", a.capabilities)
@@ -69,10 +73,27 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/audit/export", a.auditExport)
 	mux.HandleFunc("GET /api/settings", a.settings)
 	mux.HandleFunc("PATCH /api/settings", a.updateSettings)
+	mux.HandleFunc("GET /api/client/bootstrap", a.clientBootstrap)
+	mux.HandleFunc("POST /api/client/link", a.createClientLink)
+	mux.HandleFunc("GET /api/client/link/{code}", a.pollClientLink)
+	mux.HandleFunc("POST /api/client/link/{code}/approve", a.approveClientLink)
+	mux.HandleFunc("POST /api/client/device", a.enrollDevice)
+	mux.HandleFunc("GET /api/client/device", a.checkDevice)
+	mux.HandleFunc("DELETE /api/client/device", a.deleteDevice)
+	mux.HandleFunc("GET /api/client/network", a.clientNetwork)
+	mux.HandleFunc("POST /api/client/machines/keys", a.createClientKey)
+	mux.HandleFunc("PATCH /api/client/machines/{id}", a.updateClientMachine)
+	mux.HandleFunc("DELETE /api/client/machines/{id}", a.deleteClientMachine)
+	mux.HandleFunc("POST /api/client/apps", a.saveClientApp)
+	mux.HandleFunc("PATCH /api/client/apps/{id}", a.saveClientApp)
+	mux.HandleFunc("DELETE /api/client/apps/{id}", a.deleteClientApp)
 	return mux
 }
 
 func loginServer() string {
+	if raw := strings.TrimSpace(os.Getenv("HEADSCALE_PUBLIC_URL")); raw != "" {
+		return strings.TrimRight(raw, "/")
+	}
 	raw := strings.TrimSpace(os.Getenv("OTTERSCALE_DOMAIN"))
 	if raw == "" {
 		return "http://127.0.0.1:8080"

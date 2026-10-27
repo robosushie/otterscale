@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+
+	"golang.org/x/oauth2"
 )
 
 func (a *API) oidcStart(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +24,9 @@ func (a *API) oidcStart(w http.ResponseWriter, r *http.Request) {
 	secure := strings.HasPrefix(strings.ToLower(os.Getenv("AUTH_URL")), "https://")
 	http.SetCookie(w, &http.Cookie{Name: "otterscale_oidc_state", Value: state, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: 600})
 	http.SetCookie(w, &http.Cookie{Name: "otterscale_oidc_verifier", Value: verifier, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: 600})
+	if next := safeNext(r.URL.Query().Get("next")); next != "" {
+		http.SetCookie(w, &http.Cookie{Name: "otterscale_oidc_next", Value: url.QueryEscape(next), Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: 600})
+	}
 	http.Redirect(w, r, cfg.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier)), http.StatusFound)
 }
 
@@ -68,8 +73,24 @@ func (a *API) oidcCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	clear("otterscale_oidc_state")
 	clear("otterscale_oidc_verifier")
+	dest := "/machines"
+	if next, err := r.Cookie("otterscale_oidc_next"); err == nil {
+		decoded, _ := url.QueryUnescape(next.Value)
+		if safe := safeNext(decoded); safe != "" {
+			dest = safe
+		}
+	}
+	clear("otterscale_oidc_next")
 	a.setSession(w, r, userID)
-	http.Redirect(w, r, "/machines", http.StatusFound)
+	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+func safeNext(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.ContainsAny(raw, "\\\r\n") {
+		return ""
+	}
+	return raw
 }
 
 type oidcInfo struct {
@@ -83,12 +104,16 @@ type oidcEndpoints struct {
 	Userinfo string
 }
 
-func (a *API) oidcConfig(ctx context.Context, r *http.Request) (*oauth2.Config, error) {
+func (a *API) oidcConfig(ctx context.Context, _ *http.Request) (*oauth2.Config, error) {
 	issuer := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_OIDC_ISSUER")), "/")
 	clientID := strings.TrimSpace(os.Getenv("AUTH_OIDC_CLIENT_ID"))
 	secret := strings.TrimSpace(os.Getenv("AUTH_OIDC_CLIENT_SECRET"))
 	if issuer == "" || clientID == "" || secret == "" {
 		return nil, errOIDCDisabled
+	}
+	redirect, err := oidcRedirect()
+	if err != nil {
+		return nil, err
 	}
 	endpoints, err := discoverOIDC(ctx, issuer)
 	if err != nil {
@@ -97,7 +122,7 @@ func (a *API) oidcConfig(ctx context.Context, r *http.Request) (*oauth2.Config, 
 	return &oauth2.Config{
 		ClientID: clientID, ClientSecret: secret,
 		Endpoint:    endpoints.Endpoint,
-		RedirectURL: oidcRedirect(r),
+		RedirectURL: redirect,
 		Scopes:      []string{"openid", "email", "profile"},
 	}, nil
 }
@@ -157,19 +182,12 @@ func fetchUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.Token)
 	return info, nil
 }
 
-func oidcRedirect(r *http.Request) string {
-	if base := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_URL")), "/"); base != "" {
-		return base + "/api/auth/oidc/callback"
+func oidcRedirect() (string, error) {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_URL")), "/")
+	if base == "" {
+		return "", errString("AUTH_URL is required for OIDC")
 	}
-	scheme := "http"
-	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
-		scheme = "https"
-	}
-	host := r.Host
-	if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
-		host = forwarded
-	}
-	return scheme + "://" + host + "/api/auth/oidc/callback"
+	return base + "/api/auth/oidc/callback", nil
 }
 
 func randomToken() string {

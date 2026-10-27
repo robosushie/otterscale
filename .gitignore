@@ -45,6 +45,12 @@ next-env.d.ts
 /proxy
 /cmd/proxy/proxy
 /cmd/proxy/proxy.exe
+packages/client/tailscaled
+packages/client/tailscaled.exe
+packages/client/otterscale.exe
+packages/client/otterscale-desktop.exe
+packages/client/packaging/**/dist/
+packages/client/packaging/windows/.wix/
 
 # Caddy local CA exported by pnpm deploy:stack
 /deployment/caddy-root.crt

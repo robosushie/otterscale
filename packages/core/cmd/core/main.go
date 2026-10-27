@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"otterscale/core/internal/audit"
 	"otterscale/core/internal/db"
-	"otterscale/core/internal/http"
+	httpapi "otterscale/core/internal/http"
 	"otterscale/core/internal/store"
 )
 
@@ -29,6 +30,9 @@ func main() {
 	}
 	if err := db.Migrate(ctx, database); err != nil {
 		log.Fatal(err)
+	}
+	if err := audit.CheckTip(ctx, database); err != nil {
+		log.Printf("audit chain tip mismatch: %v", err)
 	}
 	cancel()
 
