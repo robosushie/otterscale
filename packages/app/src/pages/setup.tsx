@@ -36,6 +36,7 @@ export function SetupPage({ oidc, google }: { oidc: boolean; google: boolean }) 
           }
           prepareTotp={(username) => asResult(() => api.totp(username))}
           submitLabel="Create Owner account"
+          showSetupToken
           oidcEnabled={oidc}
           googleOidcEnabled={google}
         />

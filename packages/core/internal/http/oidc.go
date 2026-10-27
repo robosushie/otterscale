@@ -104,12 +104,16 @@ type oidcEndpoints struct {
 	Userinfo string
 }
 
-func (a *API) oidcConfig(ctx context.Context, r *http.Request) (*oauth2.Config, error) {
+func (a *API) oidcConfig(ctx context.Context, _ *http.Request) (*oauth2.Config, error) {
 	issuer := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_OIDC_ISSUER")), "/")
 	clientID := strings.TrimSpace(os.Getenv("AUTH_OIDC_CLIENT_ID"))
 	secret := strings.TrimSpace(os.Getenv("AUTH_OIDC_CLIENT_SECRET"))
 	if issuer == "" || clientID == "" || secret == "" {
 		return nil, errOIDCDisabled
+	}
+	redirect, err := oidcRedirect()
+	if err != nil {
+		return nil, err
 	}
 	endpoints, err := discoverOIDC(ctx, issuer)
 	if err != nil {
@@ -118,7 +122,7 @@ func (a *API) oidcConfig(ctx context.Context, r *http.Request) (*oauth2.Config, 
 	return &oauth2.Config{
 		ClientID: clientID, ClientSecret: secret,
 		Endpoint:    endpoints.Endpoint,
-		RedirectURL: oidcRedirect(r),
+		RedirectURL: redirect,
 		Scopes:      []string{"openid", "email", "profile"},
 	}, nil
 }
@@ -178,19 +182,12 @@ func fetchUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.Token)
 	return info, nil
 }
 
-func oidcRedirect(r *http.Request) string {
-	if base := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_URL")), "/"); base != "" {
-		return base + "/api/auth/oidc/callback"
+func oidcRedirect() (string, error) {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_URL")), "/")
+	if base == "" {
+		return "", errString("AUTH_URL is required for OIDC")
 	}
-	scheme := "http"
-	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
-		scheme = "https"
-	}
-	host := r.Host
-	if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
-		host = forwarded
-	}
-	return scheme + "://" + host + "/api/auth/oidc/callback"
+	return base + "/api/auth/oidc/callback", nil
 }
 
 func randomToken() string {

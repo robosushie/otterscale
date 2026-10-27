@@ -2,11 +2,15 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
+	"strings"
 	"time"
 
 	"otterscale/core/internal/apps"
 	"otterscale/core/internal/audit"
+	"otterscale/core/internal/auth"
 	"otterscale/core/internal/authz"
 	"otterscale/core/internal/db"
 	"otterscale/core/internal/headscale"
@@ -40,6 +44,10 @@ func (s *Store) DefaultOrg(ctx context.Context) (Org, error) {
 
 func (s *Store) HasOwner(ctx context.Context) (bool, error) {
 	return org.HasOwner(ctx, s.DB)
+}
+
+func (s *Store) OwnerUserID(ctx context.Context) (string, error) {
+	return org.OwnerUserID(ctx, s.DB)
 }
 
 func (s *Store) UpdateOrg(ctx context.Context, name, appsDomain string, expiryHours int) error {
@@ -187,28 +195,63 @@ func (s *Store) MachinesTable(ctx context.Context, authz Capabilities, nodes []h
 }
 
 func (s *Store) CreateSession(ctx context.Context, userID string) (string, error) {
-	token := id.New() + id.New()
+	sessionID := id.New()
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	verifier := base64.RawURLEncoding.EncodeToString(buf)
 	_, err := s.DB.Exec(ctx, `INSERT INTO "Session" ("id","sessionToken","userId","expires") VALUES (?,?,?,?)`,
-		id.New(), token, userID, time.Now().UTC().Add(14*24*time.Hour))
-	return token, err
-}
-
-func (s *Store) UserIDForSession(ctx context.Context, token string) (string, error) {
-	var userID string
-	var expires time.Time
-	err := s.DB.QueryRow(ctx, `SELECT "userId","expires" FROM "Session" WHERE "sessionToken"=?`, token).Scan(&userID, &expires)
+		sessionID, auth.TokenHash(verifier), userID, time.Now().UTC().Add(14*24*time.Hour))
 	if err != nil {
 		return "", err
 	}
+	return sessionID + "." + verifier, nil
+}
+
+func splitSession(token string) (sessionID, verifier string, ok bool) {
+	sessionID, verifier, ok = strings.Cut(token, ".")
+	if !ok || sessionID == "" || verifier == "" {
+		return "", "", false
+	}
+	return sessionID, verifier, true
+}
+
+func (s *Store) UserIDForSession(ctx context.Context, token string) (string, error) {
+	sessionID, verifier, ok := splitSession(token)
+	if !ok {
+		return "", sql.ErrNoRows
+	}
+	var userID, hash string
+	var expires time.Time
+	err := s.DB.QueryRow(ctx, `SELECT "userId","sessionToken","expires" FROM "Session" WHERE "id"=?`, sessionID).Scan(&userID, &hash, &expires)
+	if err != nil {
+		return "", err
+	}
+	if !auth.TokenEqual(verifier, hash) {
+		return "", sql.ErrNoRows
+	}
 	if time.Now().After(expires) {
-		_, _ = s.DB.Exec(ctx, `DELETE FROM "Session" WHERE "sessionToken"=?`, token)
+		_, _ = s.DB.Exec(ctx, `DELETE FROM "Session" WHERE "id"=?`, sessionID)
 		return "", sql.ErrNoRows
 	}
 	return userID, nil
 }
 
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
-	_, err := s.DB.Exec(ctx, `DELETE FROM "Session" WHERE "sessionToken"=?`, token)
+	sessionID, verifier, ok := splitSession(token)
+	if !ok {
+		return sql.ErrNoRows
+	}
+	var hash string
+	err := s.DB.QueryRow(ctx, `SELECT "sessionToken" FROM "Session" WHERE "id"=?`, sessionID).Scan(&hash)
+	if err != nil {
+		return err
+	}
+	if !auth.TokenEqual(verifier, hash) {
+		return sql.ErrNoRows
+	}
+	_, err = s.DB.Exec(ctx, `DELETE FROM "Session" WHERE "id"=?`, sessionID)
 	return err
 }
 

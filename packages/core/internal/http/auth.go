@@ -68,7 +68,7 @@ func (a *API) setup(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "Invalid body")
 		return
 	}
-	if token := strings.TrimSpace(os.Getenv("AUTH_SETUP_TOKEN")); token != "" && body.SetupToken != token {
+	if !setupAllowed(r, body.SetupToken) {
 		fail(w, http.StatusForbidden, "Invalid setup token.")
 		return
 	}
@@ -115,8 +115,15 @@ func (a *API) setup(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusConflict, "Username or email already in use.")
 		return
 	}
-	if err := a.Store.BootstrapOwner(r.Context(), userID, email); err != nil {
-		fail(w, http.StatusInternalServerError, err.Error())
+	bootErr := a.Store.BootstrapOwner(r.Context(), userID, email)
+	ownerID, ownerErr := a.Store.OwnerUserID(r.Context())
+	if ownerErr != nil || ownerID != userID {
+		_, _ = a.Store.DB.Exec(r.Context(), `DELETE FROM "User" WHERE "id"=?`, userID)
+		fail(w, http.StatusConflict, "Setup already complete.")
+		return
+	}
+	if bootErr != nil {
+		fail(w, http.StatusInternalServerError, "Could not finish setup.")
 		return
 	}
 	a.setSession(w, r, userID)

@@ -3,10 +3,10 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
+	"otterscale/core/internal/apps"
 	"otterscale/core/internal/headscale"
 	"otterscale/core/internal/machines"
 )
@@ -146,9 +146,13 @@ func (a *API) saveClientApp(w http.ResponseWriter, r *http.Request) {
 		Port      int    `json:"port"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	sub := cleanSubdomain(body.Subdomain)
+	sub := apps.CleanSubdomain(body.Subdomain)
 	if body.MachineID == "" || body.Port < 1 || body.Port > 65535 || sub == "" {
 		fail(w, http.StatusBadRequest, "Machine, port, and subdomain are required")
+		return
+	}
+	if err := a.validateSubdomain(r, sub); err != nil {
+		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !a.machineOwned(w, r, body.MachineID, userID) {
@@ -256,8 +260,10 @@ func (a *API) machineTagACL(r *http.Request, machineID string) []string {
 	return tags
 }
 
-var subdomainClean = regexp.MustCompile(`[^a-z0-9-]+`)
-
-func cleanSubdomain(raw string) string {
-	return strings.Trim(subdomainClean.ReplaceAllString(strings.ToLower(raw), "-"), "-")
+func (a *API) validateSubdomain(r *http.Request, sub string) error {
+	organisation, err := a.Store.DefaultOrg(r.Context())
+	if err != nil {
+		return err
+	}
+	return apps.ValidateSubdomain(sub, organisation.AppsBaseDomain, apps.ConsoleHost())
 }

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 )
 
 func TestInviteRedeem(t *testing.T) {
+	t.Setenv("AUTH_SECRET", strings.Repeat("s", 32))
+	t.Setenv("OTTERSCALE_DATA_DIR", t.TempDir())
 	ctx := context.Background()
 	database, err := db.Open(ctx, "", t.TempDir())
 	if err != nil {
@@ -45,6 +48,28 @@ func TestInviteRedeem(t *testing.T) {
 	}
 	if invite.Email != "new@example.com" || invite.OrganizationID != org.ID {
 		t.Fatalf("invite %#v", invite)
+	}
+	selector, verifier, ok := strings.Cut(code, ".")
+	if !ok || selector == "" || verifier == "" {
+		t.Fatalf("code %q", code)
+	}
+	var stored string
+	if err := database.QueryRow(ctx, `SELECT "codeHash" FROM "UserInvite" WHERE "codeSelector"=?`, selector).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored == verifier || stored != auth.TokenHash(verifier) {
+		t.Fatal("invite verifier must be stored as a hash")
+	}
+	if _, err := st.FindInviteByCode(ctx, selector+"."+verifier+"x"); err == nil {
+		t.Fatal("wrong code should not match")
+	}
+	now = time.Now().UTC()
+	if _, err := database.Exec(ctx, `INSERT INTO "UserInvite" ("id","organizationId","email","username","codeHash","tenantRole","createdById","expiresAt","createdAt","revokedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		id.New(), org.ID, "old@example.com", "old.user", "$argon2id$v=19$m=1,t=1,p=1$aa$bb", "MEMBER", actor, now.Add(time.Hour), now, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.FindInviteByCode(ctx, "legacy.verifier"); err == nil {
+		t.Fatal("revoked pre-migration invite should not match")
 	}
 	userID := id.New()
 	if _, err := database.Exec(ctx, `INSERT INTO "User" ("id","username","email","passwordHash","totpEnabled","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,

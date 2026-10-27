@@ -17,10 +17,11 @@ type API struct {
 	Live     *live.Hub
 	links    *linkBook
 	linkOnce sync.Once
+	limits   *slidingLimiter
 }
 
 func New(st *store.Store, secret string) *API {
-	api := &API{Store: st, Secret: secret, Live: live.NewHub()}
+	api := &API{Store: st, Secret: secret, Live: live.NewHub(), limits: newSlidingLimiter()}
 	api.Live.Sync = api.watchHeadscale
 	return api
 }
@@ -31,12 +32,12 @@ func (a *API) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 	})
 	mux.HandleFunc("GET /api/auth/session", a.session)
-	mux.HandleFunc("POST /api/auth/setup", a.setup)
-	mux.HandleFunc("POST /api/auth/totp", a.totpURI)
-	mux.HandleFunc("POST /api/auth/signin", a.signin)
+	mux.HandleFunc("POST /api/auth/setup", a.limitClient("setup", 5, time.Hour, a.setup))
+	mux.HandleFunc("POST /api/auth/totp", a.limitClient("totp", 10, 15*time.Minute, a.totpURI))
+	mux.HandleFunc("POST /api/auth/signin", a.limitSignin(a.signin))
 	mux.HandleFunc("POST /api/auth/signout", a.signout)
-	mux.HandleFunc("POST /api/auth/invite/lookup", a.lookupInvite)
-	mux.HandleFunc("POST /api/auth/redeem", a.redeemInvite)
+	mux.HandleFunc("POST /api/auth/invite/lookup", a.limitClient("invite-lookup", 10, 15*time.Minute, a.lookupInvite))
+	mux.HandleFunc("POST /api/auth/redeem", a.limitClient("redeem", 10, 15*time.Minute, a.redeemInvite))
 	mux.HandleFunc("GET /api/auth/oidc/start", a.oidcStart)
 	mux.HandleFunc("GET /api/auth/oidc/callback", a.oidcCallback)
 	mux.HandleFunc("GET /api/me/capabilities", a.capabilities)

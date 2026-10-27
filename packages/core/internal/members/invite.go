@@ -33,15 +33,11 @@ func CreateInvite(ctx context.Context, database *db.DB, actorID, email, username
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	username = strings.TrimSpace(username)
-	raw := make([]byte, 24)
-	if _, err := rand.Read(raw); err != nil {
-		return "", "", time.Time{}, err
-	}
-	code = base64.RawURLEncoding.EncodeToString(raw)
-	hash, err := auth.HashPassword(code)
+	selector, verifier, err := newInviteCode()
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
+	code = selector + "." + verifier
 	now := time.Now().UTC()
 	expires = now.Add(7 * 24 * time.Hour)
 	_, _ = database.Exec(ctx, `UPDATE "UserInvite" SET "revokedAt"=? WHERE "organizationId"=? AND lower("email")=? AND "redeemedAt" IS NULL AND "revokedAt" IS NULL`, now, organisation.ID, email)
@@ -50,8 +46,8 @@ func CreateInvite(ctx context.Context, database *db.DB, actorID, email, username
 	if platformRole != nil && *platformRole != "" {
 		role = *platformRole
 	}
-	if _, err := database.Exec(ctx, `INSERT INTO "UserInvite" ("id","organizationId","email","username","codeHash","tenantRole","platformRole","createdById","expiresAt","createdAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		inviteID, organisation.ID, email, username, hash, tenantRole, role, actorID, expires, now); err != nil {
+	if _, err := database.Exec(ctx, `INSERT INTO "UserInvite" ("id","organizationId","email","username","codeHash","codeSelector","tenantRole","platformRole","createdById","expiresAt","createdAt") VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		inviteID, organisation.ID, email, username, auth.TokenHash(verifier), selector, tenantRole, role, actorID, expires, now); err != nil {
 		return "", "", time.Time{}, err
 	}
 	for _, groupID := range groupIDs {
@@ -65,49 +61,73 @@ func CreateInvite(ctx context.Context, database *db.DB, actorID, email, username
 	return code, inviteID, expires, nil
 }
 
+func newInviteCode() (selector, verifier string, err error) {
+	sel := make([]byte, 16)
+	ver := make([]byte, 32)
+	if _, err = rand.Read(sel); err != nil {
+		return "", "", err
+	}
+	if _, err = rand.Read(ver); err != nil {
+		return "", "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(sel), base64.RawURLEncoding.EncodeToString(ver), nil
+}
+
+func splitInviteCode(code string) (selector, verifier string, ok bool) {
+	selector, verifier, ok = strings.Cut(strings.TrimSpace(code), ".")
+	if !ok || selector == "" || verifier == "" || strings.Contains(verifier, ".") {
+		return "", "", false
+	}
+	return selector, verifier, true
+}
+
 func FindInviteByCode(ctx context.Context, database *db.DB, code string) (Invite, error) {
-	code = strings.TrimSpace(code)
-	if code == "" {
+	selector, verifier, ok := splitInviteCode(code)
+	if !ok {
 		return Invite{}, sql.ErrNoRows
 	}
-	rows, err := database.Query(ctx, `SELECT "id","organizationId","email","username","codeHash","tenantRole","platformRole","expiresAt" FROM "UserInvite" WHERE "revokedAt" IS NULL AND "redeemedAt" IS NULL`)
+	var invite Invite
+	var hash string
+	var expires time.Time
+	err := database.QueryRow(ctx, `SELECT "id","organizationId","email","username","codeHash","tenantRole","platformRole","expiresAt" FROM "UserInvite" WHERE "codeSelector"=? AND "revokedAt" IS NULL AND "redeemedAt" IS NULL`, selector).
+		Scan(&invite.ID, &invite.OrganizationID, &invite.Email, &invite.Username, &hash, &invite.TenantRole, &invite.PlatformRole, &expires)
+	if !auth.TokenEqual(verifier, hash) || err != nil || !expires.After(time.Now().UTC()) {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return Invite{}, err
+		}
+		return Invite{}, sql.ErrNoRows
+	}
+	ids, err := database.Query(ctx, `SELECT "groupId" FROM "UserInviteWorkspace" WHERE "inviteId"=?`, invite.ID)
 	if err != nil {
 		return Invite{}, err
 	}
-	defer rows.Close()
-	now := time.Now().UTC()
-	for rows.Next() {
-		var invite Invite
-		var hash string
-		var expires time.Time
-		if err := rows.Scan(&invite.ID, &invite.OrganizationID, &invite.Email, &invite.Username, &hash, &invite.TenantRole, &invite.PlatformRole, &expires); err != nil {
-			return Invite{}, err
-		}
-		if !expires.After(now) || !auth.VerifyPassword(code, hash) {
-			continue
-		}
-		ids, err := database.Query(ctx, `SELECT "groupId" FROM "UserInviteWorkspace" WHERE "inviteId"=?`, invite.ID)
-		if err != nil {
-			return Invite{}, err
-		}
-		for ids.Next() {
-			var groupID string
-			_ = ids.Scan(&groupID)
-			invite.GroupIDs = append(invite.GroupIDs, groupID)
-		}
-		ids.Close()
-		return invite, nil
+	defer ids.Close()
+	for ids.Next() {
+		var groupID string
+		_ = ids.Scan(&groupID)
+		invite.GroupIDs = append(invite.GroupIDs, groupID)
 	}
-	return Invite{}, sql.ErrNoRows
+	return invite, ids.Err()
 }
 
 func ApplyInvite(ctx context.Context, database *db.DB, userID, email string, invite Invite) error {
 	now := time.Now().UTC()
+	res, err := database.Exec(ctx, `UPDATE "UserInvite" SET "redeemedAt"=?, "redeemedByUserId"=? WHERE "id"=? AND "redeemedAt" IS NULL`, now, userID, invite.ID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("invite already redeemed")
+	}
 	if invite.PlatformRole.Valid && invite.PlatformRole.String == "SUPER_ADMIN" {
 		_, _ = database.Exec(ctx, `INSERT INTO "PlatformMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?) ON CONFLICT ("userId","role") DO NOTHING`, id.New(), userID, "SUPER_ADMIN", now)
 	}
 	var tenantID string
-	err := database.QueryRow(ctx, `SELECT "id" FROM "TenantMembership" WHERE "userId"=? ORDER BY "createdAt" ASC LIMIT 1`, userID).Scan(&tenantID)
+	err = database.QueryRow(ctx, `SELECT "id" FROM "TenantMembership" WHERE "userId"=? ORDER BY "createdAt" ASC LIMIT 1`, userID).Scan(&tenantID)
 	if errors.Is(err, sql.ErrNoRows) {
 		_, err = database.Exec(ctx, `INSERT INTO "TenantMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?)`, id.New(), userID, invite.TenantRole, now)
 	} else if err == nil {
@@ -141,10 +161,6 @@ func ApplyInvite(ctx context.Context, database *db.DB, userID, email string, inv
 		if err != nil {
 			return err
 		}
-	}
-	_, err = database.Exec(ctx, `UPDATE "UserInvite" SET "redeemedAt"=?, "redeemedByUserId"=? WHERE "id"=?`, now, userID, invite.ID)
-	if err != nil {
-		return err
 	}
 	return audit.Append(ctx, database, invite.OrganizationID, userID, "member.invite_redeemed", "SYSTEM", "user_invite", invite.ID, nil)
 }

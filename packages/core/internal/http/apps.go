@@ -3,8 +3,8 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
-	"strings"
+
+	"otterscale/core/internal/apps"
 )
 
 func (a *API) apps(w http.ResponseWriter, r *http.Request) {
@@ -34,9 +34,13 @@ func (a *API) publishApp(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	sub := strings.ToLower(strings.Trim(regexp.MustCompile(`[^a-z0-9-]+`).ReplaceAllString(strings.ToLower(body.Subdomain), "-"), "-"))
+	sub := apps.CleanSubdomain(body.Subdomain)
 	if body.MachineID == "" || body.Port < 1 || body.Port > 65535 || sub == "" {
 		fail(w, http.StatusBadRequest, "Machine, port, and subdomain are required")
+		return
+	}
+	if err := a.validateSubdomain(r, sub); err != nil {
+		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	status := "ACTIVE"

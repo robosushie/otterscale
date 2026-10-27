@@ -143,7 +143,7 @@ Never commit `.env`. Copy from [`.env.example`](./.env.example).
 | `AUTH_OIDC_ISSUER` | Optional | OIDC issuer; SSO buttons stay off until all three OIDC vars are set |
 | `AUTH_OIDC_CLIENT_ID` | Optional | OIDC client id |
 | `AUTH_OIDC_CLIENT_SECRET` | Optional | OIDC client secret |
-| `AUTH_SETUP_TOKEN` | Optional | Token required for first Owner signup on `/setup` |
+| `AUTH_SETUP_TOKEN` | Yes for first-run | Required to create the first Owner on `/setup`. `AUTH_SETUP_OPEN=1` allows that request only from a loopback TCP peer |
 | `HEADSCALE_INTERNAL_URL` | Docker | App → Headscale (`http://headscale:8080`) |
 | `HEADSCALE_PUBLIC_URL` | Docker | Public Headscale URL |
 | `OTTERSCALE_DOMAIN` | Production | Login-server for Add device (HTTPS). Unset → `http://127.0.0.1:8080` |

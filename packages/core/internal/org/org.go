@@ -69,6 +69,12 @@ func Default(ctx context.Context, database *db.DB) (Org, error) {
 	return organisation, nil
 }
 
+func OwnerUserID(ctx context.Context, database *db.DB) (string, error) {
+	var userID string
+	err := database.QueryRow(ctx, `SELECT "userId" FROM "PlatformMembership" WHERE "role"='OWNER' LIMIT 1`).Scan(&userID)
+	return userID, err
+}
+
 func HasOwner(ctx context.Context, database *db.DB) (bool, error) {
 	var n int
 	err := database.QueryRow(ctx, `SELECT COUNT(*) FROM "PlatformMembership" WHERE "role"='OWNER'`).Scan(&n)
@@ -110,7 +116,9 @@ func Bootstrap(ctx context.Context, database *db.DB, userID, email string) error
 	}
 	now := time.Now().UTC()
 	for _, role := range []string{"OWNER", "SUPER_ADMIN"} {
-		_, _ = database.Exec(ctx, `INSERT INTO "PlatformMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?)`, id.New(), userID, role, now)
+		if _, err := database.Exec(ctx, `INSERT INTO "PlatformMembership" ("id","userId","role","createdAt") VALUES (?,?,?,?)`, id.New(), userID, role, now); err != nil {
+			return err
+		}
 	}
 	var n int
 	_ = database.QueryRow(ctx, `SELECT COUNT(*) FROM "TenantMembership" WHERE "userId"=?`, userID).Scan(&n)

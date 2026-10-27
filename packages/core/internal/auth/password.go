@@ -27,11 +27,21 @@ func ValidatePassword(plain string) string {
 	return ""
 }
 
+// argonSlots caps concurrent memory-hard hashes for this process.
+var argonSlots = make(chan struct{}, 4)
+
+func enterArgon() func() {
+	argonSlots <- struct{}{}
+	return func() { <-argonSlots }
+}
+
 func HashPassword(plain string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
+	release := enterArgon()
+	defer release()
 	sum := argon2.IDKey([]byte(plain), salt, argonTime, argonMemory, argonParallelism, argonKeyLen)
 	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
 		argonMemory, argonTime, argonParallelism,
@@ -45,7 +55,9 @@ func VerifyPassword(plain, encoded string) bool {
 	if err != nil {
 		return false
 	}
+	release := enterArgon()
 	got := argon2.IDKey([]byte(plain), salt, time, mem, threads, uint32(len(sum)))
+	release()
 	return subtle.ConstantTimeCompare(got, sum) == 1
 }
 
